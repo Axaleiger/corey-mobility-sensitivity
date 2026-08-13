@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
   <style>
     :root {
       --bg0: #f3f0ea;
@@ -24,17 +25,10 @@
       --bad: #b42318;
       --bad-soft: #fde2e0;
       --ok: #0f6e56;
-      --series-base: #1a242c;
-      --series-curr: #0f6e56;
-      --series-ao: #c45c26;
-      --series-aw: #2f5d8c;
-      --series-krw: #7a3e9d;
       --shadow: 0 18px 40px rgba(26, 36, 44, 0.08);
       --radius: 18px;
     }
-
     * { box-sizing: border-box; }
-    html { scroll-behavior: smooth; }
     body {
       margin: 0;
       color: var(--ink);
@@ -45,424 +39,490 @@
         linear-gradient(165deg, var(--bg0), var(--bg1));
       min-height: 100vh;
     }
-
-    .wrap {
-      width: min(1180px, calc(100% - 2rem));
-      margin: 0 auto;
-      padding: 2rem 0 3.5rem;
-    }
-
-    header.hero {
-      display: grid;
-      gap: 1rem;
-      margin-bottom: 1.5rem;
-      animation: rise 0.7s ease both;
-    }
-
+    .wrap { width: min(1240px, calc(100% - 2rem)); margin: 0 auto; padding: 1.6rem 0 3rem; }
     .brand {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.65rem;
-      font-weight: 800;
-      letter-spacing: -0.03em;
-      font-size: clamp(1.6rem, 3vw, 2.2rem);
+      display: inline-flex; align-items: center; gap: 0.65rem;
+      font-weight: 800; letter-spacing: -0.03em;
+      font-size: clamp(1.45rem, 2.8vw, 2rem);
     }
     .brand-mark {
-      width: 0.85em;
-      height: 0.85em;
-      border-radius: 0.28em;
+      width: 0.85em; height: 0.85em; border-radius: 0.28em;
       background: linear-gradient(135deg, #0f6e56, #3aa78a 55%, #8fd0ba);
-      box-shadow: inset 0 0 0 2px rgba(255,255,255,0.35);
     }
-    .lead {
-      max-width: 48rem;
-      margin: 0;
-      color: var(--muted);
-      font-size: 1.05rem;
-      line-height: 1.55;
-    }
+    .lead { max-width: 52rem; margin: 0.55rem 0 0; color: var(--muted); line-height: 1.5; }
 
-    .status-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.6rem;
-      align-items: center;
-    }
-    .pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.4rem;
-      padding: 0.45rem 0.8rem;
-      border-radius: 999px;
-      font-size: 0.85rem;
-      font-weight: 600;
+    .tabs {
+      display: flex; flex-wrap: wrap; gap: 0.4rem;
+      margin: 1.2rem 0 1rem;
+      padding: 0.35rem;
+      background: rgba(255,252,247,0.7);
       border: 1px solid var(--line);
-      background: var(--panel);
+      border-radius: 14px;
+      width: fit-content;
+    }
+    .tab-btn {
+      font-family: inherit; font-weight: 700; font-size: 0.92rem;
+      border: 0; background: transparent; color: var(--muted);
+      border-radius: 10px; padding: 0.55rem 0.95rem; cursor: pointer;
+    }
+    .tab-btn.active { background: var(--accent); color: #fff; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    .status-row { display: flex; flex-wrap: wrap; gap: 0.55rem; margin: 0.7rem 0 1rem; }
+    .pill {
+      display: inline-flex; align-items: center; gap: 0.35rem;
+      padding: 0.4rem 0.75rem; border-radius: 999px; font-size: 0.82rem; font-weight: 600;
+      border: 1px solid var(--line); background: var(--panel);
     }
     .pill.ok { background: var(--accent-soft); color: var(--ok); border-color: transparent; }
     .pill.bad { background: var(--bad-soft); color: var(--bad); border-color: transparent; }
     .pill.warn { background: var(--warn-soft); color: var(--warn); border-color: transparent; }
-    .dot {
-      width: 0.55rem; height: 0.55rem; border-radius: 50%;
-      background: currentColor;
-    }
+    .dot { width: 0.5rem; height: 0.5rem; border-radius: 50%; background: currentColor; }
 
-    .layout {
-      display: grid;
-      grid-template-columns: 320px 1fr;
-      gap: 1.1rem;
-      align-items: start;
-    }
-    @media (max-width: 920px) {
-      .layout { grid-template-columns: 1fr; }
-    }
+    .layout { display: grid; grid-template-columns: 320px 1fr; gap: 1rem; align-items: start; }
+    @media (max-width: 960px) { .layout { grid-template-columns: 1fr; } }
 
     .panel {
-      background: var(--panel);
-      backdrop-filter: blur(10px);
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      padding: 1.1rem 1.15rem;
-      animation: rise 0.75s ease both;
+      background: var(--panel); backdrop-filter: blur(10px);
+      border: 1px solid var(--line); border-radius: var(--radius);
+      box-shadow: var(--shadow); padding: 1.05rem 1.1rem;
     }
     .panel h2 {
-      margin: 0 0 0.85rem;
-      font-size: 0.95rem;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-      color: var(--muted);
-      font-weight: 700;
+      margin: 0 0 0.8rem; font-size: 0.9rem; letter-spacing: 0.04em;
+      text-transform: uppercase; color: var(--muted); font-weight: 700;
     }
-
-    .controls { position: sticky; top: 1rem; display: grid; gap: 1rem; }
-
-    .param {
-      display: grid;
-      gap: 0.45rem;
-      padding: 0.85rem 0.9rem;
-      border-radius: 14px;
-      background: var(--panel-solid);
-      border: 1px solid var(--line);
-    }
-    .param-head {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      gap: 0.5rem;
-    }
-    .param-name { font-weight: 700; font-size: 0.98rem; }
-    .param-cell {
-      font-family: "JetBrains Mono", monospace;
-      font-size: 0.75rem;
-      color: var(--muted);
-    }
-    .param-val {
-      font-family: "JetBrains Mono", monospace;
-      font-weight: 600;
-      font-size: 1rem;
-    }
-    .bounds {
-      font-family: "JetBrains Mono", monospace;
-      font-size: 0.72rem;
-      color: var(--muted);
-    }
-    input[type="range"] {
-      width: 100%;
-      accent-color: var(--accent);
-      cursor: pointer;
-    }
-    .bar-track {
-      position: relative;
-      height: 8px;
-      border-radius: 99px;
-      background: #e6e2da;
-      overflow: hidden;
-      margin-top: 0.15rem;
-    }
-    .bar-ok {
-      position: absolute;
-      top: 0; bottom: 0;
-      background: linear-gradient(90deg, #9ed9c4, #0f6e56);
-      border-radius: 99px;
-      opacity: 0.85;
-    }
-    .bar-knob {
-      position: absolute;
-      top: 50%;
-      width: 3px;
-      height: 14px;
-      margin-top: -7px;
-      background: var(--ink);
-      border-radius: 2px;
-      transform: translateX(-50%);
-    }
-
-    .btn-row { display: flex; gap: 0.5rem; flex-wrap: wrap; }
-    button {
-      font-family: inherit;
-      font-weight: 700;
-      border: 1px solid var(--line);
-      background: var(--panel-solid);
-      color: var(--ink);
-      border-radius: 12px;
-      padding: 0.65rem 0.9rem;
-      cursor: pointer;
-      transition: transform 0.15s ease, background 0.15s ease;
-    }
-    button:hover { transform: translateY(-1px); background: #fff; }
-    button.primary {
-      background: var(--accent);
-      color: #fff;
-      border-color: transparent;
-    }
-    button.primary:hover { background: #0c5a46; }
-
-    .charts { display: grid; gap: 1.1rem; }
-    .chart-card { min-height: 0; }
-    .chart-title {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      gap: 0.75rem;
-      margin-bottom: 0.4rem;
-    }
-    .chart-title h3 {
-      margin: 0;
-      font-size: 1.05rem;
-      letter-spacing: -0.02em;
-    }
-    .chart-note {
-      margin: 0 0 0.7rem;
-      color: var(--muted);
-      font-size: 0.84rem;
-      line-height: 1.4;
-    }
+    .panel h3 { margin: 0; font-size: 1.02rem; letter-spacing: -0.02em; }
+    .chart-note { margin: 0.35rem 0 0.7rem; color: var(--muted); font-size: 0.84rem; line-height: 1.4; }
+    .charts { display: grid; gap: 1rem; }
     .canvas-box { position: relative; height: 320px; }
     .canvas-box.tall { height: 360px; }
+    .grid-2 { display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 1rem; }
+    @media (max-width: 960px) { .grid-2 { grid-template-columns: 1fr; } }
 
-    .grid-2 {
-      display: grid;
-      grid-template-columns: 1.15fr 0.85fr;
-      gap: 1.1rem;
+    .controls { position: sticky; top: 0.8rem; display: grid; gap: 0.85rem; }
+    .param {
+      display: grid; gap: 0.4rem; padding: 0.8rem 0.85rem; border-radius: 14px;
+      background: var(--panel-solid); border: 1px solid var(--line);
     }
-    @media (max-width: 920px) {
-      .grid-2 { grid-template-columns: 1fr; }
-    }
+    .param-head { display: flex; justify-content: space-between; gap: 0.5rem; align-items: baseline; }
+    .param-name { font-weight: 700; }
+    .param-cell { font-family: "JetBrains Mono", monospace; font-size: 0.72rem; color: var(--muted); }
+    .param-val { font-family: "JetBrains Mono", monospace; font-weight: 600; }
+    .bounds { font-family: "JetBrains Mono", monospace; font-size: 0.72rem; color: var(--muted); }
+    input[type="range"] { width: 100%; accent-color: var(--accent); cursor: pointer; }
+    .bar-track { position: relative; height: 8px; border-radius: 99px; background: #e6e2da; overflow: hidden; }
+    .bar-ok { position: absolute; top: 0; bottom: 0; background: linear-gradient(90deg, #9ed9c4, #0f6e56); opacity: 0.85; }
+    .bar-knob { position: absolute; top: 50%; width: 3px; height: 14px; margin-top: -7px; background: var(--ink); transform: translateX(-50%); }
 
-    .metric-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 0.65rem;
+    .btn-row { display: flex; gap: 0.45rem; flex-wrap: wrap; }
+    button, .btn {
+      font-family: inherit; font-weight: 700; border: 1px solid var(--line);
+      background: var(--panel-solid); color: var(--ink); border-radius: 12px;
+      padding: 0.6rem 0.85rem; cursor: pointer;
     }
-    @media (max-width: 640px) {
-      .metric-grid { grid-template-columns: 1fr; }
-    }
+    button.primary, .btn.primary { background: var(--accent); color: #fff; border-color: transparent; }
+    button:hover { filter: brightness(0.98); }
+
+    .metric-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.6rem; }
+    @media (max-width: 700px) { .metric-grid { grid-template-columns: 1fr; } }
     .metric {
-      background: var(--panel-solid);
-      border: 1px solid var(--line);
-      border-radius: 14px;
-      padding: 0.8rem 0.9rem;
+      background: var(--panel-solid); border: 1px solid var(--line);
+      border-radius: 14px; padding: 0.75rem 0.85rem;
     }
-    .metric .label { color: var(--muted); font-size: 0.78rem; font-weight: 600; }
-    .metric .value {
-      font-family: "JetBrains Mono", monospace;
-      font-size: 1.25rem;
-      font-weight: 600;
-      margin-top: 0.2rem;
-    }
-    .metric .sub { color: var(--muted); font-size: 0.75rem; margin-top: 0.2rem; }
+    .metric .label { color: var(--muted); font-size: 0.76rem; font-weight: 600; }
+    .metric .value { font-family: "JetBrains Mono", monospace; font-size: 1.15rem; font-weight: 600; margin-top: 0.15rem; }
+    .metric .sub { color: var(--muted); font-size: 0.74rem; margin-top: 0.15rem; }
 
-    .legend-inline {
-      display: flex; flex-wrap: wrap; gap: 0.7rem;
-      font-size: 0.78rem; color: var(--muted); margin-top: 0.5rem;
-    }
-    .legend-inline span { display: inline-flex; align-items: center; gap: 0.35rem; }
-    .swatch {
-      width: 0.7rem; height: 0.7rem; border-radius: 3px; display: inline-block;
-    }
+    footer.note { margin-top: 0.9rem; color: var(--muted); font-size: 0.8rem; line-height: 1.45; }
 
-    footer {
-      margin-top: 1.4rem;
-      color: var(--muted);
-      font-size: 0.8rem;
-      line-height: 1.45;
+    /* Hypercube */
+    .cube-layout { display: grid; grid-template-columns: 280px 1fr; gap: 1rem; }
+    @media (max-width: 960px) { .cube-layout { grid-template-columns: 1fr; } }
+    .cube-plots { display: grid; gap: 1rem; }
+    .cube-plot { height: 460px; }
+    .cube-plot.short { height: 420px; }
+    .field { display: grid; gap: 0.3rem; margin-bottom: 0.75rem; }
+    .field label { font-size: 0.8rem; font-weight: 700; color: var(--muted); }
+    .field select, .field input[type="number"], .field input[type="text"], .field textarea {
+      width: 100%; font-family: "JetBrains Mono", monospace; font-size: 0.88rem;
+      border: 1px solid var(--line); border-radius: 10px; padding: 0.55rem 0.65rem;
+      background: var(--panel-solid); color: var(--ink);
     }
+    .field textarea { min-height: 160px; resize: vertical; line-height: 1.4; }
+    .legend-box {
+      margin-top: 0.5rem; padding: 0.75rem; border-radius: 12px;
+      background: var(--panel-solid); border: 1px solid var(--line);
+    }
+    .colorbar {
+      height: 14px; border-radius: 8px;
+      background: linear-gradient(90deg, #0d0887, #6a00a8, #b12a90, #e16462, #fca636, #f0f921);
+      margin: 0.4rem 0;
+    }
+    .colorbar-labels {
+      display: flex; justify-content: space-between;
+      font-family: "JetBrains Mono", monospace; font-size: 0.72rem; color: var(--muted);
+    }
+    .seg {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.35rem;
+      margin-bottom: 0.75rem;
+    }
+    .seg button {
+      padding: 0.45rem 0.3rem; font-size: 0.78rem; border-radius: 10px;
+    }
+    .seg button.active { background: var(--accent); color: #fff; border-color: transparent; }
 
-    @keyframes rise {
-      from { opacity: 0; transform: translateY(10px); }
-      to { opacity: 1; transform: translateY(0); }
+    .inputs-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;
     }
+    @media (max-width: 900px) { .inputs-grid { grid-template-columns: 1fr; } }
+    .hint { font-size: 0.78rem; color: var(--muted); line-height: 1.4; }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <header class="hero">
-      <div class="brand"><span class="brand-mark" aria-hidden="true"></span>Corey Bounds</div>
-      <p class="lead">
-        Интерактивная оценка чувствительности параметров Corey
-        (<span style="font-family:JetBrains Mono,monospace">ao</span>,
-        <span style="font-family:JetBrains Mono,monospace">aw</span>,
-        <span style="font-family:JetBrains Mono,monospace">krw</span>)
-        к полной подвижности в столбце M. Критерий: профиль M не отличается от базы более чем в 3 раза.
-      </p>
-      <div class="status-row" id="statusRow"></div>
-    </header>
+    <div class="brand"><span class="brand-mark"></span>Corey Bounds</div>
+    <p class="lead">
+      Оценка чувствительности параметров Corey (α<sub>o</sub>, α<sub>w</sub>, krw) к полной подвижности M.
+      Критерий: профиль M не отличается от базы более чем в 3 раза.
+    </p>
 
-    <div class="layout">
-      <aside class="controls panel">
-        <h2>Параметры</h2>
+    <nav class="tabs" role="tablist">
+      <button class="tab-btn active" data-tab="sens" type="button">Чувствительность</button>
+      <button class="tab-btn" data-tab="cube" type="button">Гиперкуб</button>
+      <button class="tab-btn" data-tab="inputs" type="button">Входные данные</button>
+    </nav>
 
-        <div class="param" data-key="ao">
-          <div class="param-head">
-            <div>
-              <div class="param-name">ao — показатель нефти</div>
-              <div class="param-cell">ячейка C3</div>
+    <div class="status-row" id="statusRow"></div>
+
+    <!-- TAB: sensitivity -->
+    <div class="tab-panel active" id="tab-sens">
+      <div class="layout">
+        <aside class="controls panel">
+          <h2>Параметры сценария</h2>
+          <div class="param" data-key="ao">
+            <div class="param-head">
+              <div>
+                <div class="param-name">αo — нефть</div>
+                <div class="param-cell">ячейка C3</div>
+              </div>
+              <div class="param-val" id="aoVal">3.05</div>
             </div>
-            <div class="param-val" id="aoVal">3.05</div>
+            <input id="ao" type="range" min="0.5" max="7" step="0.01" value="3.05" />
+            <div class="bar-track" id="aoTrack"><div class="bar-ok"></div><div class="bar-knob"></div></div>
+            <div class="bounds" id="aoBounds"></div>
           </div>
-          <input id="ao" type="range" min="0.5" max="7" step="0.01" value="3.05" />
-          <div class="bar-track" id="aoTrack"><div class="bar-ok"></div><div class="bar-knob"></div></div>
-          <div class="bounds" id="aoBounds"></div>
-        </div>
-
-        <div class="param" data-key="aw">
-          <div class="param-head">
-            <div>
-              <div class="param-name">aw — показатель воды</div>
-              <div class="param-cell">ячейка D3</div>
+          <div class="param" data-key="aw">
+            <div class="param-head">
+              <div>
+                <div class="param-name">αw — вода</div>
+                <div class="param-cell">ячейка D3</div>
+              </div>
+              <div class="param-val" id="awVal">5.00</div>
             </div>
-            <div class="param-val" id="awVal">5.00</div>
+            <input id="aw" type="range" min="0.5" max="9" step="0.01" value="5" />
+            <div class="bar-track" id="awTrack"><div class="bar-ok"></div><div class="bar-knob"></div></div>
+            <div class="bounds" id="awBounds"></div>
           </div>
-          <input id="aw" type="range" min="0.5" max="9" step="0.01" value="5" />
-          <div class="bar-track" id="awTrack"><div class="bar-ok"></div><div class="bar-knob"></div></div>
-          <div class="bounds" id="awBounds"></div>
-        </div>
-
-        <div class="param" data-key="krw">
-          <div class="param-head">
-            <div>
-              <div class="param-name">krw — концевая проницаемость</div>
-              <div class="param-cell">ячейка E3</div>
+          <div class="param" data-key="krw">
+            <div class="param-head">
+              <div>
+                <div class="param-name">krw</div>
+                <div class="param-cell">ячейка E3</div>
+              </div>
+              <div class="param-val" id="krwVal">0.100</div>
             </div>
-            <div class="param-val" id="krwVal">0.100</div>
+            <input id="krw" type="range" min="0.01" max="0.6" step="0.001" value="0.1" />
+            <div class="bar-track" id="krwTrack"><div class="bar-ok"></div><div class="bar-knob"></div></div>
+            <div class="bounds" id="krwBounds"></div>
           </div>
-          <input id="krw" type="range" min="0.01" max="0.6" step="0.001" value="0.1" />
-          <div class="bar-track" id="krwTrack"><div class="bar-ok"></div><div class="bar-knob"></div></div>
-          <div class="bounds" id="krwBounds"></div>
-        </div>
-
-        <div class="btn-row">
-          <button class="primary" id="btnReset" type="button">База Excel</button>
-          <button id="btnEdges" type="button">Показать границы</button>
-        </div>
-
-        <div class="metric-grid" style="grid-template-columns:1fr; margin-top:0.2rem">
-          <div class="metric">
+          <div class="btn-row">
+            <button class="primary" id="btnReset" type="button">База</button>
+            <button id="btnEdges" type="button">Границы</button>
+          </div>
+          <div class="metric" style="margin-top:0.2rem">
             <div class="label">Макс. кратность vs база</div>
             <div class="value" id="foldNow">1.00×</div>
-            <div class="sub" id="foldHint">по всем точкам профиля M(kin)</div>
+            <div class="sub">по всем точкам профиля M(kin)</div>
           </div>
           <div class="metric">
             <div class="label">max(M) / min(M)</div>
             <div class="value" id="spanNow">—</div>
-            <div class="sub">размах подвижности текущего сценария</div>
+            <div class="sub">размах текущего сценария</div>
           </div>
-        </div>
-      </aside>
+        </aside>
 
-      <main class="charts">
-        <section class="panel chart-card">
-          <div class="chart-title">
+        <main class="charts">
+          <section class="panel">
             <h3>Профиль подвижности M(kin)</h3>
-          </div>
-          <p class="chart-note">
-            M = kw/μ<sub>w</sub> + ko/μ<sub>o</sub>, где ko = (1 − S)<sup>ao</sup>, kw = krw · S<sup>aw</sup>, S = kin / max_kin.
-            Чёрная кривая — база из Excel; зелёная — текущие параметры.
-          </p>
-          <div class="canvas-box tall"><canvas id="chartMobility"></canvas></div>
-          <div class="legend-inline">
-            <span><i class="swatch" style="background:var(--series-base)"></i>База (3.05 / 5 / 0.1)</span>
-            <span><i class="swatch" style="background:var(--series-curr)"></i>Текущий сценарий</span>
-          </div>
-        </section>
-
-        <div class="grid-2">
-          <section class="panel chart-card">
-            <div class="chart-title"><h3>Кратность M / M<sub>base</sub> вдоль kin</h3></div>
-            <p class="chart-note">
-              По каждой точке kin: во сколько раз текущая подвижность больше или меньше базовой.
-              Красная зона — выход за предел 3×.
-            </p>
-            <div class="canvas-box"><canvas id="chartFold"></canvas></div>
+            <p class="chart-note">M = kw/μw + ko/μo · чёрная — база, зелёная — текущий сценарий.</p>
+            <div class="canvas-box tall"><canvas id="chartMobility"></canvas></div>
           </section>
+          <div class="grid-2">
+            <section class="panel">
+              <h3>Кратность M / Mbase</h3>
+              <p class="chart-note">Красные линии — предел 3× и 1/3.</p>
+              <div class="canvas-box"><canvas id="chartFold"></canvas></div>
+            </section>
+            <section class="panel">
+              <h3>Границы OAT (±3×)</h3>
+              <p class="chart-note">One-at-a-time при фиксированных остальных на базе.</p>
+              <div class="canvas-box"><canvas id="chartBounds"></canvas></div>
+            </section>
+          </div>
+          <section class="panel">
+            <h3>Tornado на краях</h3>
+            <div class="canvas-box" style="height:260px"><canvas id="chartTornado"></canvas></div>
+          </section>
+          <section class="panel">
+            <h2>Сводка</h2>
+            <div class="metric-grid" id="summaryCards"></div>
+            <footer class="note" id="footerNote"></footer>
+          </section>
+        </main>
+      </div>
+    </div>
 
-          <section class="panel chart-card">
-            <div class="chart-title"><h3>Границы OAT (±3×)</h3></div>
-            <p class="chart-note">
-              Диапазоны one-at-a-time при фиксированных остальных параметрах на базе.
-            </p>
-            <div class="canvas-box"><canvas id="chartBounds"></canvas></div>
+    <!-- TAB: hypercube -->
+    <div class="tab-panel" id="tab-cube">
+      <div class="cube-layout">
+        <aside class="panel controls">
+          <h2>Гиперкуб αo × αw × krw</h2>
+          <p class="hint">Цвет точки — скаляр подвижности по выбранной метрике. Срез фиксирует одну ось и показывает 2D-теплокарту.</p>
+
+          <div class="field">
+            <label>Метрика цвета (подвижность)</label>
+            <select id="cubeMetric">
+              <option value="mean">Среднее M по kin</option>
+              <option value="min">Минимум M</option>
+              <option value="max">Максимум M</option>
+              <option value="end">M на конце kin</option>
+              <option value="at">M при выбранном kin</option>
+              <option value="fold">Кратность vs база (max fold)</option>
+            </select>
+          </div>
+          <div class="field" id="cubeKinField" style="display:none">
+            <label>kin для метрики</label>
+            <input type="range" id="cubeKinIdx" min="0" max="91" step="1" value="46" />
+            <div class="bounds" id="cubeKinLabel">kin = —</div>
+          </div>
+
+          <div class="field">
+            <label>Плоскость среза</label>
+            <div class="seg" id="slicePlaneSeg">
+              <button type="button" data-plane="ao" class="active">фикс αo</button>
+              <button type="button" data-plane="aw">фикс αw</button>
+              <button type="button" data-plane="krw">фикс krw</button>
+            </div>
+          </div>
+          <div class="field">
+            <label id="sliceValueLabel">Значение среза αo</label>
+            <input type="range" id="sliceValue" min="0" max="100" step="1" value="50" />
+            <div class="bounds" id="sliceValueText">—</div>
+          </div>
+
+          <div class="field">
+            <label>Разрешение сетки</label>
+            <select id="cubeRes">
+              <option value="8">8³ (быстро)</option>
+              <option value="12" selected>12³</option>
+              <option value="16">16³ (детально)</option>
+            </select>
+          </div>
+
+          <div class="legend-box">
+            <div style="font-weight:700; font-size:0.85rem; margin-bottom:0.25rem">Палитра подвижности</div>
+            <div class="colorbar"></div>
+            <div class="colorbar-labels">
+              <span id="cbarMin">min</span>
+              <span id="cbarMid">mid</span>
+              <span id="cbarMax">max</span>
+            </div>
+            <div class="hint" style="margin-top:0.45rem" id="cubeRangeHint">Диапазоны осей берутся из OAT-допуска ≤3×.</div>
+          </div>
+
+          <div class="btn-row" style="margin-top:0.5rem">
+            <button class="primary" id="btnRebuildCube" type="button">Пересчитать куб</button>
+          </div>
+        </aside>
+
+        <div class="cube-plots">
+          <section class="panel">
+            <h3>3D: αo · αw · krw</h3>
+            <p class="chart-note">Полупрозрачный объём + плоскость текущего среза. Вращайте мышью.</p>
+            <div class="cube-plot" id="plot3d"></div>
+          </section>
+          <section class="panel">
+            <h3 id="sliceTitle">2D-срез</h3>
+            <p class="chart-note" id="sliceNote">Теплокарта в выбранной плоскости.</p>
+            <div class="cube-plot short" id="plot2d"></div>
           </section>
         </div>
+      </div>
+    </div>
 
-        <section class="panel chart-card">
-          <div class="chart-title"><h3>Tornado: вклад параметров на краях диапазона</h3></div>
-          <p class="chart-note">
-            Для каждого параметра — максимальная кратность профиля M на нижней и верхней границе чувствительности
-            (при остальных параметрах = база). Чем длиннее бар, тем сильнее влияние на краю.
-          </p>
-          <div class="canvas-box" style="height:280px"><canvas id="chartTornado"></canvas></div>
+    <!-- TAB: inputs -->
+    <div class="tab-panel" id="tab-inputs">
+      <div class="inputs-grid">
+        <section class="panel">
+          <h2>Физические константы и Corey-база</h2>
+          <div class="field">
+            <label>μw — вязкость воды (H1)</label>
+            <input type="number" id="inMuW" step="0.0001" />
+          </div>
+          <div class="field">
+            <label>μo — вязкость нефти (H)</label>
+            <input type="number" id="inMuO" step="0.0001" />
+          </div>
+          <div class="field">
+            <label>max_kin (G)</label>
+            <input type="number" id="inMaxKin" step="0.001" />
+          </div>
+          <div class="field">
+            <label>Δkin шаг (A4)</label>
+            <input type="number" id="inDKin" step="0.00001" />
+          </div>
+          <div class="field">
+            <label>Число точек профиля N</label>
+            <input type="number" id="inN" step="1" min="5" max="500" />
+          </div>
+          <div class="field">
+            <label>αo база (C3)</label>
+            <input type="number" id="inAo" step="0.01" />
+          </div>
+          <div class="field">
+            <label>αw база (D3)</label>
+            <input type="number" id="inAw" step="0.01" />
+          </div>
+          <div class="field">
+            <label>krw база (E3)</label>
+            <input type="number" id="inKrw" step="0.001" />
+          </div>
+          <div class="field">
+            <label>Порог кратности</label>
+            <input type="number" id="inFold" step="0.1" min="1.1" value="3" />
+          </div>
+          <div class="btn-row">
+            <button class="primary" id="btnApplyInputs" type="button">Применить</button>
+            <button id="btnResetInputs" type="button">Сброс Excel</button>
+          </div>
+          <p class="hint" style="margin-top:0.7rem" id="inputsStatus"></p>
         </section>
 
         <section class="panel">
-          <h2>Сводка границ</h2>
-          <div class="metric-grid" id="summaryCards"></div>
-          <footer>
-            Источник формул: лист Excel «Анализ учета подвижности…».
-            Константы: μ<sub>w</sub> = 0.0043, μ<sub>o</sub> = 0.009, max_kin = 0.198, Δkin = 0.00418 (92 точки, как строки 3–94).
-            Критерий чувствительности: max<sub>i</sub> max(M<sub>i</sub>/Mbase<sub>i</sub>, Mbase<sub>i</sub>/M<sub>i</sub>) ≤ 3.
-          </footer>
+          <h2>Ряд КИН (kin)</h2>
+          <p class="hint">По умолчанию: kin<sub>i</sub> = i · Δkin. Можно задать свой список через запятую или с новой строки. При применении списка N и Δkin подстроятся.</p>
+          <div class="field">
+            <label>Режим ряда</label>
+            <select id="kinMode">
+              <option value="auto">Авто: i · Δkin</option>
+              <option value="custom">Свой список</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Значения kin</label>
+            <textarea id="inKinList" spellcheck="false"></textarea>
+          </div>
+          <div class="metric-grid" style="grid-template-columns:1fr 1fr">
+            <div class="metric">
+              <div class="label">Точек</div>
+              <div class="value" id="kinCount">—</div>
+            </div>
+            <div class="metric">
+              <div class="label">kin min → max</div>
+              <div class="value" id="kinRange" style="font-size:0.95rem">—</div>
+            </div>
+          </div>
         </section>
-      </main>
+      </div>
     </div>
   </div>
 
   <script>
-    const CONST = {
+  (() => {
+    const DEFAULTS = {
       MU_W: 0.0043,
       MU_O: 0.009,
       MAX_KIN: 0.198,
       DF: 0.00418,
       N: 92,
+      ao: 3.05,
+      aw: 5.0,
+      krw: 0.1,
+      foldLimit: 3,
     };
 
-    const BASE = { ao: 3.05, aw: 5.0, krw: 0.1 };
+    const COLORSALE = [
+      [0, "#0d0887"], [0.2, "#6a00a8"], [0.4, "#b12a90"],
+      [0.6, "#e16462"], [0.8, "#fca636"], [1, "#f0f921"],
+    ];
 
-    // Precomputed OAT bounds (excel-like formulas, fold ≤ 3 vs base)
-    const BOUNDS = {
-      ao:  { lo: 1.691, hi: 4.761, min: 0.5, max: 7,   color: "#c45c26" },
-      aw:  { lo: 3.317, hi: 6.683, min: 0.5, max: 9,   color: "#2f5d8c" },
-      krw: { lo: 0.0333, hi: 0.300, min: 0.01, max: 0.6, color: "#7a3e9d" },
+    const model = {
+      MU_W: DEFAULTS.MU_W,
+      MU_O: DEFAULTS.MU_O,
+      MAX_KIN: DEFAULTS.MAX_KIN,
+      DF: DEFAULTS.DF,
+      foldLimit: DEFAULTS.foldLimit,
+      kins: [],
+      BASE: { ao: DEFAULTS.ao, aw: DEFAULTS.aw, krw: DEFAULTS.krw },
+      BOUNDS: {
+        ao:  { lo: 1.691, hi: 4.761, min: 0.5, max: 7 },
+        aw:  { lo: 3.317, hi: 6.683, min: 0.5, max: 9 },
+        krw: { lo: 0.0333, hi: 0.300, min: 0.01, max: 0.6 },
+      },
+      baseM: [],
     };
 
-    const KINS = Array.from({ length: CONST.N }, (_, i) => i * CONST.DF);
+    const state = { ao: DEFAULTS.ao, aw: DEFAULTS.aw, krw: DEFAULTS.krw };
+    const cubeUI = { plane: "ao", sliceT: 0.5, metric: "mean", kinIdx: 46, res: 12, ready: false };
 
-    function mobilityProfile(ao, aw, krw) {
-      const out = new Array(CONST.N);
-      for (let i = 0; i < CONST.N; i++) {
-        const sn = KINS[i] / CONST.MAX_KIN;
+    function buildAutoKins(n, df) {
+      return Array.from({ length: n }, (_, i) => i * df);
+    }
+
+    function parseKinList(text) {
+      return text
+        .split(/[\s,;]+/)
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .map(Number)
+        .filter((x) => Number.isFinite(x) && x >= 0);
+    }
+
+    function mobilityProfile(ao, aw, krw, kins = model.kins) {
+      const out = new Array(kins.length);
+      const maxKin = model.MAX_KIN;
+      const muW = model.MU_W;
+      const muO = model.MU_O;
+      for (let i = 0; i < kins.length; i++) {
+        const sn = maxKin > 0 ? kins[i] / maxKin : 0;
         const base = 1 - sn;
         const ko = base > 0 ? Math.pow(base, ao) : 0;
         const kw = sn > 0 ? krw * Math.pow(sn, aw) : 0;
-        out[i] = kw / CONST.MU_W + ko / CONST.MU_O;
+        out[i] = kw / muW + ko / muO;
       }
       return out;
     }
 
+    function mobilityScalar(ao, aw, krw, metric, kinIdx) {
+      const m = mobilityProfile(ao, aw, krw);
+      if (!m.length) return NaN;
+      if (metric === "min") return Math.min(...m);
+      if (metric === "max") return Math.max(...m);
+      if (metric === "end") return m[m.length - 1];
+      if (metric === "at") return m[Math.min(Math.max(kinIdx, 0), m.length - 1)];
+      if (metric === "fold") return maxFold(m, model.baseM);
+      // mean
+      let s = 0;
+      for (const v of m) s += v;
+      return s / m.length;
+    }
+
     function maxFold(curr, base) {
       let m = 1;
-      for (let i = 0; i < curr.length; i++) {
+      const n = Math.min(curr.length, base.length);
+      for (let i = 0; i < n; i++) {
+        if (!(base[i] > 0) || !(curr[i] > 0)) continue;
         const r = curr[i] / base[i];
         const f = r >= 1 ? r : 1 / r;
         if (f > m) m = f;
@@ -470,313 +530,200 @@
       return m;
     }
 
-    function foldSeries(curr, base) {
-      return curr.map((v, i) => v / base[i]);
-    }
-
     function fmt(x, digits = 3) {
+      if (!Number.isFinite(x)) return "—";
       if (Math.abs(x) >= 100) return x.toFixed(1);
       if (Math.abs(x) >= 10) return x.toFixed(2);
       return x.toFixed(digits);
     }
 
-    const baseM = mobilityProfile(BASE.ao, BASE.aw, BASE.krw);
+    function findOatBound(param, direction) {
+      // direction: 'lo' expand down from base, 'hi' expand up
+      const base = model.BASE;
+      const baseM = model.baseM;
+      const limit = model.foldLimit;
+      const ranges = {
+        ao: [0.2, 10],
+        aw: [0.2, 12],
+        krw: [0.005, 1.5],
+      };
+      const [minV, maxV] = ranges[param];
+      const x0 = base[param];
 
-    const state = { ao: BASE.ao, aw: BASE.aw, krw: BASE.krw };
+      const ok = (x) => {
+        const p = { ...base, [param]: x };
+        return maxFold(mobilityProfile(p.ao, p.aw, p.krw), baseM) <= limit + 1e-9;
+      };
 
-    // Charts
-    const commonOpts = {
-      responsive: true,
-      maintainAspectRatio: false,
-      interaction: { mode: "index", intersect: false },
-      plugins: {
-        legend: {
-          labels: { boxWidth: 12, font: { family: "Manrope", size: 12 } },
-        },
-        tooltip: {
-          callbacks: {
-            title(items) {
-              const i = items[0].dataIndex;
-              return `kin = ${KINS[i].toFixed(5)}`;
-            },
-          },
-        },
-      },
-      scales: {
-        x: {
-          title: { display: true, text: "kin", font: { family: "Manrope", weight: "600" } },
-          ticks: { maxTicksLimit: 8, font: { family: "JetBrains Mono", size: 10 } },
-          grid: { color: "rgba(26,36,44,0.06)" },
-        },
-        y: {
-          ticks: { font: { family: "JetBrains Mono", size: 10 } },
-          grid: { color: "rgba(26,36,44,0.06)" },
-        },
-      },
-    };
-
-    const kinLabels = KINS.map((k) => k.toFixed(3));
-
-    const chartMobility = new Chart(document.getElementById("chartMobility"), {
-      type: "line",
-      data: {
-        labels: kinLabels,
-        datasets: [
-          {
-            label: "M база",
-            data: baseM,
-            borderColor: "#1a242c",
-            backgroundColor: "transparent",
-            borderWidth: 2.5,
-            pointRadius: 0,
-            tension: 0.15,
-          },
-          {
-            label: "M текущий",
-            data: baseM.slice(),
-            borderColor: "#0f6e56",
-            backgroundColor: "rgba(15,110,86,0.12)",
-            borderWidth: 2.5,
-            pointRadius: 0,
-            fill: false,
-            tension: 0.15,
-          },
-        ],
-      },
-      options: {
-        ...commonOpts,
-        scales: {
-          ...commonOpts.scales,
-          y: {
-            ...commonOpts.scales.y,
-            title: { display: true, text: "Подвижность M", font: { family: "Manrope", weight: "600" } },
-          },
-        },
-      },
-    });
-
-    const chartFold = new Chart(document.getElementById("chartFold"), {
-      type: "line",
-      data: {
-        labels: kinLabels,
-        datasets: [
-          {
-            label: "M / Mbase",
-            data: baseM.map(() => 1),
-            borderColor: "#0f6e56",
-            backgroundColor: "rgba(15,110,86,0.15)",
-            fill: true,
-            borderWidth: 2,
-            pointRadius: 0,
-            tension: 0.15,
-          },
-          {
-            label: "предел 3×",
-            data: baseM.map(() => 3),
-            borderColor: "#b42318",
-            borderDash: [6, 4],
-            borderWidth: 1.5,
-            pointRadius: 0,
-          },
-          {
-            label: "предел 1/3",
-            data: baseM.map(() => 1 / 3),
-            borderColor: "#b42318",
-            borderDash: [6, 4],
-            borderWidth: 1.5,
-            pointRadius: 0,
-          },
-        ],
-      },
-      options: {
-        ...commonOpts,
-        plugins: {
-          ...commonOpts.plugins,
-          legend: {
-            labels: {
-              boxWidth: 12,
-              font: { family: "Manrope", size: 11 },
-              filter(item) {
-                return item.text !== "предел 1/3";
-              },
-            },
-          },
-        },
-        scales: {
-          ...commonOpts.scales,
-          y: {
-            ...commonOpts.scales.y,
-            type: "logarithmic",
-            min: 0.2,
-            max: 5,
-            title: { display: true, text: "Кратность (log)", font: { family: "Manrope", weight: "600" } },
-          },
-        },
-      },
-    });
-
-    const chartBounds = new Chart(document.getElementById("chartBounds"), {
-      type: "bar",
-      data: {
-        labels: ["ao (C3)", "aw (D3)", "krw (E3)"],
-        datasets: [
-          {
-            label: "Нижняя граница",
-            data: [BOUNDS.ao.lo, BOUNDS.aw.lo, BOUNDS.krw.lo],
-            backgroundColor: ["#f0b090", "#9bb7d4", "#c9a3de"],
-            borderRadius: 8,
-            barPercentage: 0.65,
-          },
-          {
-            label: "База",
-            data: [BASE.ao, BASE.aw, BASE.krw],
-            backgroundColor: ["#c45c26", "#2f5d8c", "#7a3e9d"],
-            borderRadius: 8,
-            barPercentage: 0.65,
-          },
-          {
-            label: "Верхняя граница",
-            data: [BOUNDS.ao.hi, BOUNDS.aw.hi, BOUNDS.krw.hi],
-            backgroundColor: ["#8a3a12", "#1d3f62", "#53286d"],
-            borderRadius: 8,
-            barPercentage: 0.65,
-          },
-        ],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { labels: { boxWidth: 12, font: { family: "Manrope", size: 11 } } },
-          tooltip: {
-            callbacks: {
-              label(ctx) {
-                const label = ctx.dataset.label;
-                const v = ctx.raw;
-                return `${label}: ${fmt(v, ctx.dataIndex === 2 ? 4 : 3)}`;
-              },
-            },
-          },
-        },
-        scales: {
-          x: { ticks: { font: { family: "Manrope", size: 11 } }, grid: { display: false } },
-          y: {
-            title: { display: true, text: "Значение параметра", font: { family: "Manrope", weight: "600" } },
-            ticks: { font: { family: "JetBrains Mono", size: 10 } },
-            grid: { color: "rgba(26,36,44,0.06)" },
-          },
-        },
-      },
-    });
-
-    // Tornado at bounds
-    function foldAt(param, value) {
-      const p = { ...BASE, [param]: value };
-      return maxFold(mobilityProfile(p.ao, p.aw, p.krw), baseM);
+      if (direction === "lo") {
+        if (ok(minV)) return minV;
+        let lo = minV, hi = x0;
+        for (let i = 0; i < 40; i++) {
+          const mid = 0.5 * (lo + hi);
+          if (ok(mid)) hi = mid; else lo = mid;
+        }
+        return hi;
+      } else {
+        if (ok(maxV)) return maxV;
+        let lo = x0, hi = maxV;
+        for (let i = 0; i < 40; i++) {
+          const mid = 0.5 * (lo + hi);
+          if (ok(mid)) lo = mid; else hi = mid;
+        }
+        return lo;
+      }
     }
 
-    const tornadoLabels = [
-      "ao низ", "ao верх",
-      "aw низ", "aw верх",
-      "krw низ", "krw верх",
-    ];
-    const tornadoVals = [
-      foldAt("ao", BOUNDS.ao.lo),
-      foldAt("ao", BOUNDS.ao.hi),
-      foldAt("aw", BOUNDS.aw.lo),
-      foldAt("aw", BOUNDS.aw.hi),
-      foldAt("krw", BOUNDS.krw.lo),
-      foldAt("krw", BOUNDS.krw.hi),
-    ];
-    const tornadoColors = [
-      "#f0b090", "#c45c26",
-      "#9bb7d4", "#2f5d8c",
-      "#c9a3de", "#7a3e9d",
-    ];
+    function recomputeBounds() {
+      model.BOUNDS.ao.lo = findOatBound("ao", "lo");
+      model.BOUNDS.ao.hi = findOatBound("ao", "hi");
+      model.BOUNDS.aw.lo = findOatBound("aw", "lo");
+      model.BOUNDS.aw.hi = findOatBound("aw", "hi");
+      model.BOUNDS.krw.lo = findOatBound("krw", "lo");
+      model.BOUNDS.krw.hi = findOatBound("krw", "hi");
 
-    const chartTornado = new Chart(document.getElementById("chartTornado"), {
-      type: "bar",
-      data: {
-        labels: tornadoLabels,
-        datasets: [{
-          label: "Макс. кратность M vs база",
-          data: tornadoVals,
-          backgroundColor: tornadoColors,
-          borderRadius: 8,
-          barPercentage: 0.7,
-        }],
-      },
-      options: {
-        indexAxis: "y",
+      // slider display ranges with padding
+      for (const k of ["ao", "aw", "krw"]) {
+        const b = model.BOUNDS[k];
+        const pad = Math.max(0.05 * (b.hi - b.lo), k === "krw" ? 0.02 : 0.3);
+        b.min = Math.max(0.01, b.lo - pad);
+        b.max = b.hi + pad;
+      }
+    }
+
+    // ---- Charts (sensitivity) ----
+    let chartMobility, chartFold, chartBounds, chartTornado;
+
+    function initCharts() {
+      const commonOpts = {
         responsive: true,
         maintainAspectRatio: false,
+        interaction: { mode: "index", intersect: false },
         plugins: {
-          legend: { display: false },
+          legend: { labels: { boxWidth: 12, font: { family: "Manrope", size: 12 } } },
           tooltip: {
             callbacks: {
-              label(ctx) { return `${ctx.raw.toFixed(3)}×`; },
+              title(items) {
+                const i = items[0].dataIndex;
+                return `kin = ${model.kins[i]?.toFixed(5) ?? i}`;
+              },
             },
           },
         },
         scales: {
           x: {
-            min: 0,
-            max: 3.2,
-            title: { display: true, text: "Кратность (×)", font: { family: "Manrope", weight: "600" } },
-            ticks: { font: { family: "JetBrains Mono", size: 10 } },
+            title: { display: true, text: "kin", font: { family: "Manrope", weight: "600" } },
+            ticks: { maxTicksLimit: 8, font: { family: "JetBrains Mono", size: 10 } },
             grid: { color: "rgba(26,36,44,0.06)" },
           },
           y: {
-            ticks: { font: { family: "Manrope", size: 12 } },
-            grid: { display: false },
+            ticks: { font: { family: "JetBrains Mono", size: 10 } },
+            grid: { color: "rgba(26,36,44,0.06)" },
           },
         },
-      },
-    });
+      };
+
+      chartMobility = new Chart(document.getElementById("chartMobility"), {
+        type: "line",
+        data: { labels: [], datasets: [
+          { label: "M база", data: [], borderColor: "#1a242c", borderWidth: 2.5, pointRadius: 0, tension: 0.15 },
+          { label: "M текущий", data: [], borderColor: "#0f6e56", borderWidth: 2.5, pointRadius: 0, tension: 0.15 },
+        ]},
+        options: {
+          ...commonOpts,
+          scales: { ...commonOpts.scales, y: { ...commonOpts.scales.y, title: { display: true, text: "Подвижность M", font: { family: "Manrope", weight: "600" } } } },
+        },
+      });
+
+      chartFold = new Chart(document.getElementById("chartFold"), {
+        type: "line",
+        data: { labels: [], datasets: [
+          { label: "M / Mbase", data: [], borderColor: "#0f6e56", backgroundColor: "rgba(15,110,86,0.15)", fill: true, borderWidth: 2, pointRadius: 0, tension: 0.15 },
+          { label: "предел 3×", data: [], borderColor: "#b42318", borderDash: [6, 4], borderWidth: 1.5, pointRadius: 0 },
+          { label: "предел 1/3", data: [], borderColor: "#b42318", borderDash: [6, 4], borderWidth: 1.5, pointRadius: 0 },
+        ]},
+        options: {
+          ...commonOpts,
+          plugins: { ...commonOpts.plugins, legend: { labels: { boxWidth: 12, font: { family: "Manrope", size: 11 }, filter: (i) => i.text !== "предел 1/3" } } },
+          scales: {
+            ...commonOpts.scales,
+            y: { ...commonOpts.scales.y, type: "logarithmic", min: 0.2, max: 5, title: { display: true, text: "Кратность (log)", font: { family: "Manrope", weight: "600" } } },
+          },
+        },
+      });
+
+      chartBounds = new Chart(document.getElementById("chartBounds"), {
+        type: "bar",
+        data: {
+          labels: ["αo (C3)", "αw (D3)", "krw (E3)"],
+          datasets: [
+            { label: "Нижняя", data: [0, 0, 0], backgroundColor: ["#f0b090", "#9bb7d4", "#c9a3de"], borderRadius: 8 },
+            { label: "База", data: [0, 0, 0], backgroundColor: ["#c45c26", "#2f5d8c", "#7a3e9d"], borderRadius: 8 },
+            { label: "Верхняя", data: [0, 0, 0], backgroundColor: ["#8a3a12", "#1d3f62", "#53286d"], borderRadius: 8 },
+          ],
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { labels: { boxWidth: 12, font: { family: "Manrope", size: 11 } } } },
+          scales: {
+            x: { ticks: { font: { family: "Manrope", size: 11 } }, grid: { display: false } },
+            y: { title: { display: true, text: "Значение", font: { family: "Manrope", weight: "600" } }, ticks: { font: { family: "JetBrains Mono", size: 10 } }, grid: { color: "rgba(26,36,44,0.06)" } },
+          },
+        },
+      });
+
+      chartTornado = new Chart(document.getElementById("chartTornado"), {
+        type: "bar",
+        data: {
+          labels: ["αo низ", "αo верх", "αw низ", "αw верх", "krw низ", "krw верх"],
+          datasets: [{ label: "Кратность", data: [0,0,0,0,0,0], backgroundColor: ["#f0b090","#c45c26","#9bb7d4","#2f5d8c","#c9a3de","#7a3e9d"], borderRadius: 8 }],
+        },
+        options: {
+          indexAxis: "y", responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => `${c.raw.toFixed(3)}×` } } },
+          scales: {
+            x: { min: 0, max: 3.2, title: { display: true, text: "Кратность (×)", font: { family: "Manrope", weight: "600" } }, ticks: { font: { family: "JetBrains Mono", size: 10 } }, grid: { color: "rgba(26,36,44,0.06)" } },
+            y: { ticks: { font: { family: "Manrope", size: 12 } }, grid: { display: false } },
+          },
+        },
+      });
+    }
+
+    function syncSlidersFromBounds() {
+      for (const key of ["ao", "aw", "krw"]) {
+        const b = model.BOUNDS[key];
+        const el = document.getElementById(key);
+        el.min = b.min;
+        el.max = b.max;
+        el.step = key === "krw" ? 0.001 : 0.01;
+        if (Number(el.value) < b.min || Number(el.value) > b.max) el.value = model.BASE[key];
+      }
+      document.getElementById("ao").value = state.ao;
+      document.getElementById("aw").value = state.aw;
+      document.getElementById("krw").value = state.krw;
+    }
 
     function updateTrack(key) {
-      const b = BOUNDS[key];
+      const b = model.BOUNDS[key];
       const el = document.getElementById(key);
       const track = document.getElementById(key + "Track");
       const ok = track.querySelector(".bar-ok");
       const knob = track.querySelector(".bar-knob");
-      const span = b.max - b.min;
-      const left = ((b.lo - b.min) / span) * 100;
-      const width = ((b.hi - b.lo) / span) * 100;
-      const pos = ((Number(el.value) - b.min) / span) * 100;
-      ok.style.left = left + "%";
-      ok.style.width = width + "%";
-      knob.style.left = pos + "%";
+      const span = b.max - b.min || 1;
+      ok.style.left = ((b.lo - b.min) / span) * 100 + "%";
+      ok.style.width = ((b.hi - b.lo) / span) * 100 + "%";
+      knob.style.left = ((Number(el.value) - b.min) / span) * 100 + "%";
+      const d = key === "krw" ? 4 : 3;
       document.getElementById(key + "Bounds").textContent =
-        `допуск 3×: ${fmt(b.lo, key === "krw" ? 4 : 3)} … ${fmt(b.hi, key === "krw" ? 4 : 3)}`;
+        `допуск ${model.foldLimit}×: ${fmt(b.lo, d)} … ${fmt(b.hi, d)}`;
     }
 
     function inBounds(key, v) {
-      return v >= BOUNDS[key].lo - 1e-9 && v <= BOUNDS[key].hi + 1e-9;
+      const b = model.BOUNDS[key];
+      return v >= b.lo - 1e-9 && v <= b.hi + 1e-9;
     }
 
-    function renderSummary() {
-      const cards = [
-        { key: "ao", title: "C3 · ao", unit: "" },
-        { key: "aw", title: "D3 · aw", unit: "" },
-        { key: "krw", title: "E3 · krw", unit: "" },
-      ];
-      document.getElementById("summaryCards").innerHTML = cards.map(({ key, title }) => {
-        const b = BOUNDS[key];
-        const v = state[key];
-        const ok = inBounds(key, v);
-        return `
-          <div class="metric">
-            <div class="label">${title}</div>
-            <div class="value">${fmt(v, key === "krw" ? 4 : 3)}</div>
-            <div class="sub">${fmt(b.lo, key === "krw" ? 4 : 3)} → ${fmt(b.hi, key === "krw" ? 4 : 3)}
-              · <strong style="color:${ok ? "var(--ok)" : "var(--bad)"}">${ok ? "в допуске" : "вне допуска"}</strong>
-            </div>
-          </div>`;
-      }).join("");
-    }
-
-    function update() {
+    function updateSensitivity() {
       state.ao = Number(document.getElementById("ao").value);
       state.aw = Number(document.getElementById("aw").value);
       state.krw = Number(document.getElementById("krw").value);
@@ -784,71 +731,457 @@
       document.getElementById("aoVal").textContent = state.ao.toFixed(2);
       document.getElementById("awVal").textContent = state.aw.toFixed(2);
       document.getElementById("krwVal").textContent = state.krw.toFixed(3);
-
       ["ao", "aw", "krw"].forEach(updateTrack);
 
+      const labels = model.kins.map((k) => k.toFixed(3));
       const curr = mobilityProfile(state.ao, state.aw, state.krw);
-      const fold = maxFold(curr, baseM);
-      const ratios = foldSeries(curr, baseM);
+      const fold = maxFold(curr, model.baseM);
+      const ratios = curr.map((v, i) => (model.baseM[i] > 0 ? v / model.baseM[i] : 1));
       const span = Math.max(...curr) / Math.min(...curr);
 
+      chartMobility.data.labels = labels;
+      chartMobility.data.datasets[0].data = model.baseM;
       chartMobility.data.datasets[1].data = curr;
       chartMobility.update("none");
 
+      chartFold.data.labels = labels;
       chartFold.data.datasets[0].data = ratios;
-      const yMax = Math.max(5, Math.ceil(fold * 1.15 * 10) / 10);
+      chartFold.data.datasets[1].data = labels.map(() => model.foldLimit);
+      chartFold.data.datasets[2].data = labels.map(() => 1 / model.foldLimit);
+      const yMax = Math.max(model.foldLimit * 1.5, Math.ceil(fold * 1.15 * 10) / 10);
       chartFold.options.scales.y.max = yMax;
-      chartFold.options.scales.y.min = Math.min(0.2, 1 / yMax);
+      chartFold.options.scales.y.min = Math.min(1 / model.foldLimit / 1.5, 1 / yMax);
       chartFold.update("none");
+
+      const B = model.BOUNDS, Base = model.BASE;
+      chartBounds.data.datasets[0].data = [B.ao.lo, B.aw.lo, B.krw.lo];
+      chartBounds.data.datasets[1].data = [Base.ao, Base.aw, Base.krw];
+      chartBounds.data.datasets[2].data = [B.ao.hi, B.aw.hi, B.krw.hi];
+      chartBounds.update("none");
+
+      const foldAt = (param, value) => {
+        const p = { ...Base, [param]: value };
+        return maxFold(mobilityProfile(p.ao, p.aw, p.krw), model.baseM);
+      };
+      chartTornado.data.datasets[0].data = [
+        foldAt("ao", B.ao.lo), foldAt("ao", B.ao.hi),
+        foldAt("aw", B.aw.lo), foldAt("aw", B.aw.hi),
+        foldAt("krw", B.krw.lo), foldAt("krw", B.krw.hi),
+      ];
+      chartTornado.options.scales.x.max = Math.max(model.foldLimit + 0.2, ...chartTornado.data.datasets[0].data) * 1.05;
+      chartTornado.update("none");
 
       const foldEl = document.getElementById("foldNow");
       foldEl.textContent = fold.toFixed(2) + "×";
-      foldEl.style.color = fold <= 3 ? "var(--ok)" : "var(--bad)";
+      foldEl.style.color = fold <= model.foldLimit ? "var(--ok)" : "var(--bad)";
       document.getElementById("spanNow").textContent = span.toFixed(2) + "×";
 
-      const allOk = fold <= 3;
+      const allOk = fold <= model.foldLimit;
       const paramFlags = ["ao", "aw", "krw"].map((k) => ({ k, ok: inBounds(k, state[k]) }));
       document.getElementById("statusRow").innerHTML = `
-        <span class="pill ${allOk ? "ok" : "bad"}"><span class="dot"></span>${allOk ? "Сценарий в допуске ≤ 3×" : "Сценарий вне допуска > 3×"}</span>
-        ${paramFlags.map((p) =>
-          `<span class="pill ${p.ok ? "ok" : "warn"}"><span class="dot"></span>${p.k} ${p.ok ? "OAT OK" : "вне OAT"}</span>`
-        ).join("")}
-        <span class="pill">база ao=${BASE.ao}, aw=${BASE.aw}, krw=${BASE.krw}</span>
+        <span class="pill ${allOk ? "ok" : "bad"}"><span class="dot"></span>${allOk ? `Сценарий ≤ ${model.foldLimit}×` : `Сценарий > ${model.foldLimit}×`}</span>
+        ${paramFlags.map((p) => `<span class="pill ${p.ok ? "ok" : "warn"}"><span class="dot"></span>${p.k} ${p.ok ? "OAT OK" : "вне OAT"}</span>`).join("")}
+        <span class="pill">база αo=${Base.ao}, αw=${Base.aw}, krw=${Base.krw}</span>
       `;
 
-      renderSummary();
+      document.getElementById("summaryCards").innerHTML = ["ao", "aw", "krw"].map((key) => {
+        const b = model.BOUNDS[key];
+        const v = state[key];
+        const ok = inBounds(key, v);
+        const d = key === "krw" ? 4 : 3;
+        const title = key === "ao" ? "C3 · αo" : key === "aw" ? "D3 · αw" : "E3 · krw";
+        return `<div class="metric"><div class="label">${title}</div><div class="value">${fmt(v, d)}</div>
+          <div class="sub">${fmt(b.lo, d)} → ${fmt(b.hi, d)} · <strong style="color:${ok ? "var(--ok)" : "var(--bad)"}">${ok ? "в допуске" : "вне допуска"}</strong></div></div>`;
+      }).join("");
+
+      document.getElementById("footerNote").innerHTML =
+        `μw=${model.MU_W}, μo=${model.MU_O}, max_kin=${model.MAX_KIN}, N=${model.kins.length}. Критерий: max fold ≤ ${model.foldLimit}.`;
     }
 
+    // ---- Hypercube ----
+    function axisRange(key) {
+      const b = model.BOUNDS[key];
+      return { min: b.lo, max: b.hi };
+    }
+
+    function linspace(a, b, n) {
+      if (n <= 1) return [a];
+      const out = new Array(n);
+      for (let i = 0; i < n; i++) out[i] = a + (b - a) * (i / (n - 1));
+      return out;
+    }
+
+    function sliceValueFromUI() {
+      const key = cubeUI.plane;
+      const r = axisRange(key);
+      return r.min + (r.max - r.min) * cubeUI.sliceT;
+    }
+
+    function updateSliceLabels() {
+      const names = { ao: "αo", aw: "αw", krw: "krw" };
+      const key = cubeUI.plane;
+      const val = sliceValueFromUI();
+      document.getElementById("sliceValueLabel").textContent = `Значение среза ${names[key]}`;
+      document.getElementById("sliceValueText").textContent = `${names[key]} = ${fmt(val, key === "krw" ? 4 : 3)}`;
+      const planes = {
+        ao: "плоскость αw–krw",
+        aw: "плоскость αo–krw",
+        krw: "плоскость αo–αw",
+      };
+      document.getElementById("sliceTitle").textContent = `2D-срез: ${planes[key]}`;
+      document.getElementById("sliceNote").textContent =
+        `Фиксировано ${names[key]} = ${fmt(val, key === "krw" ? 4 : 3)}. Цвет — выбранная метрика подвижности.`;
+    }
+
+    function rebuildCube() {
+      const res = cubeUI.res;
+      const ra = axisRange("ao");
+      const rw = axisRange("aw");
+      const rk = axisRange("krw");
+      const aos = linspace(ra.min, ra.max, res);
+      const aws = linspace(rw.min, rw.max, res);
+      const krws = linspace(rk.min, rk.max, res);
+
+      const xs = [], ys = [], zs = [], cs = [];
+      let cMin = Infinity, cMax = -Infinity;
+      for (const ao of aos) {
+        for (const aw of aws) {
+          for (const krw of krws) {
+            const c = mobilityScalar(ao, aw, krw, cubeUI.metric, cubeUI.kinIdx);
+            xs.push(ao); ys.push(aw); zs.push(krw); cs.push(c);
+            if (c < cMin) cMin = c;
+            if (c > cMax) cMax = c;
+          }
+        }
+      }
+      if (!(cMax > cMin)) { cMin = 0; cMax = 1; }
+
+      document.getElementById("cbarMin").textContent = fmt(cMin, 2);
+      document.getElementById("cbarMid").textContent = fmt(0.5 * (cMin + cMax), 2);
+      document.getElementById("cbarMax").textContent = fmt(cMax, 2);
+
+      const sliceVal = sliceValueFromUI();
+      const n2 = Math.max(res, 20);
+      let x2 = [], y2 = [], z2 = [];
+      let xTitle = "", yTitle = "";
+
+      if (cubeUI.plane === "ao") {
+        xTitle = "αw"; yTitle = "krw";
+        const gx = linspace(rw.min, rw.max, n2);
+        const gy = linspace(rk.min, rk.max, n2);
+        z2 = gy.map((krw) => gx.map((aw) => mobilityScalar(sliceVal, aw, krw, cubeUI.metric, cubeUI.kinIdx)));
+        x2 = gx; y2 = gy;
+      } else if (cubeUI.plane === "aw") {
+        xTitle = "αo"; yTitle = "krw";
+        const gx = linspace(ra.min, ra.max, n2);
+        const gy = linspace(rk.min, rk.max, n2);
+        z2 = gy.map((krw) => gx.map((ao) => mobilityScalar(ao, sliceVal, krw, cubeUI.metric, cubeUI.kinIdx)));
+        x2 = gx; y2 = gy;
+      } else {
+        xTitle = "αo"; yTitle = "αw";
+        const gx = linspace(ra.min, ra.max, n2);
+        const gy = linspace(rw.min, rw.max, n2);
+        z2 = gy.map((aw) => gx.map((ao) => mobilityScalar(ao, aw, sliceVal, cubeUI.metric, cubeUI.kinIdx)));
+        x2 = gx; y2 = gy;
+      }
+
+      // slice plane markers in 3D
+      const planeX = [], planeY = [], planeZ = [], planeC = [];
+      const pRes = 18;
+      if (cubeUI.plane === "ao") {
+        for (const aw of linspace(rw.min, rw.max, pRes)) {
+          for (const krw of linspace(rk.min, rk.max, pRes)) {
+            planeX.push(sliceVal); planeY.push(aw); planeZ.push(krw);
+            planeC.push(mobilityScalar(sliceVal, aw, krw, cubeUI.metric, cubeUI.kinIdx));
+          }
+        }
+      } else if (cubeUI.plane === "aw") {
+        for (const ao of linspace(ra.min, ra.max, pRes)) {
+          for (const krw of linspace(rk.min, rk.max, pRes)) {
+            planeX.push(ao); planeY.push(sliceVal); planeZ.push(krw);
+            planeC.push(mobilityScalar(ao, sliceVal, krw, cubeUI.metric, cubeUI.kinIdx));
+          }
+        }
+      } else {
+        for (const ao of linspace(ra.min, ra.max, pRes)) {
+          for (const aw of linspace(rw.min, rw.max, pRes)) {
+            planeX.push(ao); planeY.push(aw); planeZ.push(sliceVal);
+            planeC.push(mobilityScalar(ao, aw, sliceVal, cubeUI.metric, cubeUI.kinIdx));
+          }
+        }
+      }
+
+      const metricName = document.getElementById("cubeMetric").selectedOptions[0].text;
+
+      const layout3d = {
+        margin: { l: 0, r: 0, t: 30, b: 0 },
+        paper_bgcolor: "rgba(0,0,0,0)",
+        font: { family: "Manrope", color: "#1a242c" },
+        scene: {
+          xaxis: { title: "αo (нефть)", range: [ra.min, ra.max] },
+          yaxis: { title: "αw (вода)", range: [rw.min, rw.max] },
+          zaxis: { title: "krw", range: [rk.min, rk.max] },
+          camera: { eye: { x: 1.55, y: 1.55, z: 1.15 } },
+          aspectmode: "cube",
+        },
+        legend: { orientation: "h", y: 1.08 },
+      };
+
+      const traces3d = [
+        {
+          type: "scatter3d", mode: "markers", name: "объём",
+          x: xs, y: ys, z: zs, text: cs.map((c) => `${metricName}: ${fmt(c, 3)}`),
+          hovertemplate: "αo=%{x:.3f}<br>αw=%{y:.3f}<br>krw=%{z:.4f}<br>%{text}<extra></extra>",
+          marker: {
+            size: 3.2,
+            color: cs,
+            colorscale: COLORSALE,
+            cmin: cMin, cmax: cMax,
+            opacity: 0.55,
+            colorbar: {
+              title: { text: metricName, side: "right" },
+              thickness: 14, len: 0.7,
+            },
+          },
+        },
+        {
+          type: "scatter3d", mode: "markers", name: "срез",
+          x: planeX, y: planeY, z: planeZ,
+          marker: {
+            size: 5,
+            color: planeC,
+            colorscale: COLORSALE,
+            cmin: cMin, cmax: cMax,
+            opacity: 0.95,
+            showscale: false,
+            line: { width: 0 },
+          },
+          hoverinfo: "skip",
+        },
+      ];
+
+      Plotly.react("plot3d", traces3d, layout3d, { responsive: true, displayModeBar: true, displaylogo: false });
+
+      const layout2d = {
+        margin: { l: 55, r: 30, t: 20, b: 50 },
+        paper_bgcolor: "rgba(0,0,0,0)",
+        plot_bgcolor: "#fffdf9",
+        font: { family: "Manrope", color: "#1a242c" },
+        xaxis: { title: xTitle },
+        yaxis: { title: yTitle },
+      };
+
+      Plotly.react("plot2d", [{
+        type: "heatmap",
+        x: x2, y: y2, z: z2,
+        colorscale: COLORSALE,
+        zmin: cMin, zmax: cMax,
+        colorbar: { title: metricName, thickness: 14 },
+        hovertemplate: `${xTitle}=%{x:.3f}<br>${yTitle}=%{y:.3f}<br>${metricName}=%{z:.3f}<extra></extra>`,
+      }], layout2d, { responsive: true, displayModeBar: false, displaylogo: false });
+
+      updateSliceLabels();
+      cubeUI.ready = true;
+    }
+
+    // ---- Inputs tab ----
+    function fillInputsForm() {
+      document.getElementById("inMuW").value = model.MU_W;
+      document.getElementById("inMuO").value = model.MU_O;
+      document.getElementById("inMaxKin").value = model.MAX_KIN;
+      document.getElementById("inDKin").value = model.DF;
+      document.getElementById("inN").value = model.kins.length;
+      document.getElementById("inAo").value = model.BASE.ao;
+      document.getElementById("inAw").value = model.BASE.aw;
+      document.getElementById("inKrw").value = model.BASE.krw;
+      document.getElementById("inFold").value = model.foldLimit;
+      document.getElementById("inKinList").value = model.kins.map((k) => k.toFixed(5)).join("\n");
+      document.getElementById("kinCount").textContent = String(model.kins.length);
+      document.getElementById("kinRange").textContent =
+        `${fmt(model.kins[0], 4)} → ${fmt(model.kins[model.kins.length - 1], 4)}`;
+      document.getElementById("cubeKinIdx").max = Math.max(0, model.kins.length - 1);
+    }
+
+    function applyInputs() {
+      const muW = Number(document.getElementById("inMuW").value);
+      const muO = Number(document.getElementById("inMuO").value);
+      const maxKin = Number(document.getElementById("inMaxKin").value);
+      const df = Number(document.getElementById("inDKin").value);
+      let n = Number(document.getElementById("inN").value);
+      const ao = Number(document.getElementById("inAo").value);
+      const aw = Number(document.getElementById("inAw").value);
+      const krw = Number(document.getElementById("inKrw").value);
+      const fold = Number(document.getElementById("inFold").value);
+      const mode = document.getElementById("kinMode").value;
+
+      if (!(muW > 0 && muO > 0 && maxKin > 0 && fold > 1)) {
+        document.getElementById("inputsStatus").textContent = "Проверьте: μw, μo, max_kin > 0 и порог > 1.";
+        return;
+      }
+
+      let kins;
+      if (mode === "custom") {
+        kins = parseKinList(document.getElementById("inKinList").value);
+        if (kins.length < 5) {
+          document.getElementById("inputsStatus").textContent = "В списке kin нужно ≥ 5 чисел.";
+          return;
+        }
+        n = kins.length;
+      } else {
+        if (!(df > 0) || !(n >= 5)) {
+          document.getElementById("inputsStatus").textContent = "Для авто-режима нужны Δkin > 0 и N ≥ 5.";
+          return;
+        }
+        kins = buildAutoKins(n, df);
+      }
+
+      model.MU_W = muW;
+      model.MU_O = muO;
+      model.MAX_KIN = maxKin;
+      model.DF = mode === "auto" ? df : (kins[1] - kins[0] || df);
+      model.foldLimit = fold;
+      model.kins = kins;
+      model.BASE = { ao, aw, krw };
+      model.baseM = mobilityProfile(ao, aw, krw);
+      state.ao = ao; state.aw = aw; state.krw = krw;
+
+      document.getElementById("inputsStatus").textContent = "Пересчёт OAT-границ…";
+      recomputeBounds();
+      syncSlidersFromBounds();
+      fillInputsForm();
+      updateSensitivity();
+      if (document.getElementById("tab-cube").classList.contains("active") || cubeUI.ready) {
+        rebuildCube();
+      }
+      document.getElementById("inputsStatus").textContent =
+        `Применено: N=${kins.length}, OAT αo=[${fmt(model.BOUNDS.ao.lo)}…${fmt(model.BOUNDS.ao.hi)}], αw=[${fmt(model.BOUNDS.aw.lo)}…${fmt(model.BOUNDS.aw.hi)}], krw=[${fmt(model.BOUNDS.krw.lo,4)}…${fmt(model.BOUNDS.krw.hi,4)}].`;
+    }
+
+    function resetInputsToExcel() {
+      Object.assign(model, {
+        MU_W: DEFAULTS.MU_W,
+        MU_O: DEFAULTS.MU_O,
+        MAX_KIN: DEFAULTS.MAX_KIN,
+        DF: DEFAULTS.DF,
+        foldLimit: DEFAULTS.foldLimit,
+      });
+      model.kins = buildAutoKins(DEFAULTS.N, DEFAULTS.DF);
+      model.BASE = { ao: DEFAULTS.ao, aw: DEFAULTS.aw, krw: DEFAULTS.krw };
+      model.baseM = mobilityProfile(model.BASE.ao, model.BASE.aw, model.BASE.krw);
+      state.ao = DEFAULTS.ao; state.aw = DEFAULTS.aw; state.krw = DEFAULTS.krw;
+      document.getElementById("kinMode").value = "auto";
+      // use known precomputed bounds for default excel case (faster + exact prior)
+      model.BOUNDS = {
+        ao:  { lo: 1.691, hi: 4.761, min: 0.5, max: 7 },
+        aw:  { lo: 3.317, hi: 6.683, min: 0.5, max: 9 },
+        krw: { lo: 0.0333, hi: 0.300, min: 0.01, max: 0.6 },
+      };
+      syncSlidersFromBounds();
+      fillInputsForm();
+      updateSensitivity();
+      if (cubeUI.ready) rebuildCube();
+      document.getElementById("inputsStatus").textContent = "Сброшено к значениям Excel.";
+    }
+
+    // ---- Tabs ----
+    document.querySelectorAll(".tab-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
+        document.querySelectorAll(".tab-panel").forEach((p) => p.classList.remove("active"));
+        btn.classList.add("active");
+        document.getElementById("tab-" + btn.dataset.tab).classList.add("active");
+        if (btn.dataset.tab === "cube") {
+          requestAnimationFrame(() => rebuildCube());
+        }
+        if (btn.dataset.tab === "inputs") fillInputsForm();
+      });
+    });
+
+    // ---- Wire events ----
     ["ao", "aw", "krw"].forEach((id) => {
-      document.getElementById(id).addEventListener("input", update);
+      document.getElementById(id).addEventListener("input", updateSensitivity);
     });
 
     document.getElementById("btnReset").addEventListener("click", () => {
-      document.getElementById("ao").value = BASE.ao;
-      document.getElementById("aw").value = BASE.aw;
-      document.getElementById("krw").value = BASE.krw;
-      update();
+      document.getElementById("ao").value = model.BASE.ao;
+      document.getElementById("aw").value = model.BASE.aw;
+      document.getElementById("krw").value = model.BASE.krw;
+      updateSensitivity();
     });
 
     let edgeToggle = 0;
     document.getElementById("btnEdges").addEventListener("click", () => {
+      const B = model.BOUNDS, Base = model.BASE;
       const edges = [
-        { ao: BOUNDS.ao.lo, aw: BASE.aw, krw: BASE.krw },
-        { ao: BOUNDS.ao.hi, aw: BASE.aw, krw: BASE.krw },
-        { ao: BASE.ao, aw: BOUNDS.aw.lo, krw: BASE.krw },
-        { ao: BASE.ao, aw: BOUNDS.aw.hi, krw: BASE.krw },
-        { ao: BASE.ao, aw: BASE.aw, krw: BOUNDS.krw.lo },
-        { ao: BASE.ao, aw: BASE.aw, krw: BOUNDS.krw.hi },
+        { ao: B.ao.lo, aw: Base.aw, krw: Base.krw },
+        { ao: B.ao.hi, aw: Base.aw, krw: Base.krw },
+        { ao: Base.ao, aw: B.aw.lo, krw: Base.krw },
+        { ao: Base.ao, aw: B.aw.hi, krw: Base.krw },
+        { ao: Base.ao, aw: Base.aw, krw: B.krw.lo },
+        { ao: Base.ao, aw: Base.aw, krw: B.krw.hi },
       ];
-      const e = edges[edgeToggle % edges.length];
-      edgeToggle++;
+      const e = edges[edgeToggle++ % edges.length];
       document.getElementById("ao").value = e.ao;
       document.getElementById("aw").value = e.aw;
       document.getElementById("krw").value = e.krw;
-      update();
+      updateSensitivity();
     });
 
-    update();
+    document.getElementById("slicePlaneSeg").addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-plane]");
+      if (!btn) return;
+      document.querySelectorAll("#slicePlaneSeg button").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      cubeUI.plane = btn.dataset.plane;
+      updateSliceLabels();
+      rebuildCube();
+    });
+
+    document.getElementById("sliceValue").addEventListener("input", (e) => {
+      cubeUI.sliceT = Number(e.target.value) / 100;
+      updateSliceLabels();
+      rebuildCube();
+    });
+
+    document.getElementById("cubeMetric").addEventListener("change", (e) => {
+      cubeUI.metric = e.target.value;
+      document.getElementById("cubeKinField").style.display = cubeUI.metric === "at" ? "grid" : "none";
+      rebuildCube();
+    });
+
+    document.getElementById("cubeKinIdx").addEventListener("input", (e) => {
+      cubeUI.kinIdx = Number(e.target.value);
+      const kin = model.kins[cubeUI.kinIdx] ?? 0;
+      document.getElementById("cubeKinLabel").textContent = `kin = ${kin.toFixed(5)} (i=${cubeUI.kinIdx})`;
+      if (cubeUI.metric === "at") rebuildCube();
+    });
+
+    document.getElementById("cubeRes").addEventListener("change", (e) => {
+      cubeUI.res = Number(e.target.value);
+      rebuildCube();
+    });
+
+    document.getElementById("btnRebuildCube").addEventListener("click", rebuildCube);
+    document.getElementById("btnApplyInputs").addEventListener("click", applyInputs);
+    document.getElementById("btnResetInputs").addEventListener("click", resetInputsToExcel);
+
+    document.getElementById("kinMode").addEventListener("change", () => {
+      const custom = document.getElementById("kinMode").value === "custom";
+      document.getElementById("inKinList").disabled = !custom;
+    });
+
+    // boot
+    model.kins = buildAutoKins(DEFAULTS.N, DEFAULTS.DF);
+    model.baseM = mobilityProfile(model.BASE.ao, model.BASE.aw, model.BASE.krw);
+    initCharts();
+    syncSlidersFromBounds();
+    fillInputsForm();
+    document.getElementById("inKinList").disabled = true;
+    updateSensitivity();
+    updateSliceLabels();
+    document.getElementById("cubeKinLabel").textContent =
+      `kin = ${model.kins[cubeUI.kinIdx].toFixed(5)} (i=${cubeUI.kinIdx})`;
+  })();
   </script>
 </body>
 </html>
