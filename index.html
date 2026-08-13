@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Чувствительность Corey — подвижность</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg0: #f3f0ea;
+      --bg1: #e8eef2;
+      --ink: #1a242c;
+      --muted: #5c6b76;
+      --line: rgba(26, 36, 44, 0.12);
+      --panel: rgba(255, 252, 247, 0.82);
+      --panel-solid: #fffdf9;
+      --accent: #0f6e56;
+      --accent-soft: #d8efe6;
+      --warn: #b45309;
+      --warn-soft: #fde8c8;
+      --bad: #b42318;
+      --bad-soft: #fde2e0;
+      --ok: #0f6e56;
+      --series-base: #1a242c;
+      --series-curr: #0f6e56;
+      --series-ao: #c45c26;
+      --series-aw: #2f5d8c;
+      --series-krw: #7a3e9d;
+      --shadow: 0 18px 40px rgba(26, 36, 44, 0.08);
+      --radius: 18px;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      font-family: "Manrope", system-ui, sans-serif;
+      background:
+        radial-gradient(1200px 600px at 10% -10%, #d9ebe3 0%, transparent 55%),
+        radial-gradient(900px 500px at 100% 0%, #dce6f0 0%, transparent 50%),
+        linear-gradient(165deg, var(--bg0), var(--bg1));
+      min-height: 100vh;
+    }
+
+    .wrap {
+      width: min(1180px, calc(100% - 2rem));
+      margin: 0 auto;
+      padding: 2rem 0 3.5rem;
+    }
+
+    header.hero {
+      display: grid;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+      animation: rise 0.7s ease both;
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.65rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      font-size: clamp(1.6rem, 3vw, 2.2rem);
+    }
+    .brand-mark {
+      width: 0.85em;
+      height: 0.85em;
+      border-radius: 0.28em;
+      background: linear-gradient(135deg, #0f6e56, #3aa78a 55%, #8fd0ba);
+      box-shadow: inset 0 0 0 2px rgba(255,255,255,0.35);
+    }
+    .lead {
+      max-width: 48rem;
+      margin: 0;
+      color: var(--muted);
+      font-size: 1.05rem;
+      line-height: 1.55;
+    }
+
+    .status-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+      align-items: center;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.45rem 0.8rem;
+      border-radius: 999px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      border: 1px solid var(--line);
+      background: var(--panel);
+    }
+    .pill.ok { background: var(--accent-soft); color: var(--ok); border-color: transparent; }
+    .pill.bad { background: var(--bad-soft); color: var(--bad); border-color: transparent; }
+    .pill.warn { background: var(--warn-soft); color: var(--warn); border-color: transparent; }
+    .dot {
+      width: 0.55rem; height: 0.55rem; border-radius: 50%;
+      background: currentColor;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 1.1rem;
+      align-items: start;
+    }
+    @media (max-width: 920px) {
+      .layout { grid-template-columns: 1fr; }
+    }
+
+    .panel {
+      background: var(--panel);
+      backdrop-filter: blur(10px);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 1.1rem 1.15rem;
+      animation: rise 0.75s ease both;
+    }
+    .panel h2 {
+      margin: 0 0 0.85rem;
+      font-size: 0.95rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .controls { position: sticky; top: 1rem; display: grid; gap: 1rem; }
+
+    .param {
+      display: grid;
+      gap: 0.45rem;
+      padding: 0.85rem 0.9rem;
+      border-radius: 14px;
+      background: var(--panel-solid);
+      border: 1px solid var(--line);
+    }
+    .param-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 0.5rem;
+    }
+    .param-name { font-weight: 700; font-size: 0.98rem; }
+    .param-cell {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+    .param-val {
+      font-family: "JetBrains Mono", monospace;
+      font-weight: 600;
+      font-size: 1rem;
+    }
+    .bounds {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 0.72rem;
+      color: var(--muted);
+    }
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+    .bar-track {
+      position: relative;
+      height: 8px;
+      border-radius: 99px;
+      background: #e6e2da;
+      overflow: hidden;
+      margin-top: 0.15rem;
+    }
+    .bar-ok {
+      position: absolute;
+      top: 0; bottom: 0;
+      background: linear-gradient(90deg, #9ed9c4, #0f6e56);
+      border-radius: 99px;
+      opacity: 0.85;
+    }
+    .bar-knob {
+      position: absolute;
+      top: 50%;
+      width: 3px;
+      height: 14px;
+      margin-top: -7px;
+      background: var(--ink);
+      border-radius: 2px;
+      transform: translateX(-50%);
+    }
+
+    .btn-row { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    button {
+      font-family: inherit;
+      font-weight: 700;
+      border: 1px solid var(--line);
+      background: var(--panel-solid);
+      color: var(--ink);
+      border-radius: 12px;
+      padding: 0.65rem 0.9rem;
+      cursor: pointer;
+      transition: transform 0.15s ease, background 0.15s ease;
+    }
+    button:hover { transform: translateY(-1px); background: #fff; }
+    button.primary {
+      background: var(--accent);
+      color: #fff;
+      border-color: transparent;
+    }
+    button.primary:hover { background: #0c5a46; }
+
+    .charts { display: grid; gap: 1.1rem; }
+    .chart-card { min-height: 0; }
+    .chart-title {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 0.75rem;
+      margin-bottom: 0.4rem;
+    }
+    .chart-title h3 {
+      margin: 0;
+      font-size: 1.05rem;
+      letter-spacing: -0.02em;
+    }
+    .chart-note {
+      margin: 0 0 0.7rem;
+      color: var(--muted);
+      font-size: 0.84rem;
+      line-height: 1.4;
+    }
+    .canvas-box { position: relative; height: 320px; }
+    .canvas-box.tall { height: 360px; }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 1.1rem;
+    }
+    @media (max-width: 920px) {
+      .grid-2 { grid-template-columns: 1fr; }
+    }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.65rem;
+    }
+    @media (max-width: 640px) {
+      .metric-grid { grid-template-columns: 1fr; }
+    }
+    .metric {
+      background: var(--panel-solid);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 0.8rem 0.9rem;
+    }
+    .metric .label { color: var(--muted); font-size: 0.78rem; font-weight: 600; }
+    .metric .value {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 1.25rem;
+      font-weight: 600;
+      margin-top: 0.2rem;
+    }
+    .metric .sub { color: var(--muted); font-size: 0.75rem; margin-top: 0.2rem; }
+
+    .legend-inline {
+      display: flex; flex-wrap: wrap; gap: 0.7rem;
+      font-size: 0.78rem; color: var(--muted); margin-top: 0.5rem;
+    }
+    .legend-inline span { display: inline-flex; align-items: center; gap: 0.35rem; }
+    .swatch {
+      width: 0.7rem; height: 0.7rem; border-radius: 3px; display: inline-block;
+    }
+
+    footer {
+      margin-top: 1.4rem;
+      color: var(--muted);
+      font-size: 0.8rem;
+      line-height: 1.45;
+    }
+
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="hero">
+      <div class="brand"><span class="brand-mark" aria-hidden="true"></span>Corey Bounds</div>
+      <p class="lead">
+        Интерактивная оценка чувствительности параметров Corey
+        (<span style="font-family:JetBrains Mono,monospace">ao</span>,
+        <span style="font-family:JetBrains Mono,monospace">aw</span>,
+        <span style="font-family:JetBrains Mono,monospace">krw</span>)
+        к полной подвижности в столбце M. Критерий: профиль M не отличается от базы более чем в 3 раза.
+      </p>
+      <div class="status-row" id="statusRow"></div>
+    </header>
+
+    <div class="layout">
+      <aside class="controls panel">
+        <h2>Параметры</h2>
+
+        <div class="param" data-key="ao">
+          <div class="param-head">
+            <div>
+              <div class="param-name">ao — показатель нефти</div>
+              <div class="param-cell">ячейка C3</div>
+            </div>
+            <div class="param-val" id="aoVal">3.05</div>
+          </div>
+          <input id="ao" type="range" min="0.5" max="7" step="0.01" value="3.05" />
+          <div class="bar-track" id="aoTrack"><div class="bar-ok"></div><div class="bar-knob"></div></div>
+          <div class="bounds" id="aoBounds"></div>
+        </div>
+
+        <div class="param" data-key="aw">
+          <div class="param-head">
+            <div>
+              <div class="param-name">aw — показатель воды</div>
+              <div class="param-cell">ячейка D3</div>
+            </div>
+            <div class="param-val" id="awVal">5.00</div>
+          </div>
+          <input id="aw" type="range" min="0.5" max="9" step="0.01" value="5" />
+          <div class="bar-track" id="awTrack"><div class="bar-ok"></div><div class="bar-knob"></div></div>
+          <div class="bounds" id="awBounds"></div>
+        </div>
+
+        <div class="param" data-key="krw">
+          <div class="param-head">
+            <div>
+              <div class="param-name">krw — концевая проницаемость</div>
+              <div class="param-cell">ячейка E3</div>
+            </div>
+            <div class="param-val" id="krwVal">0.100</div>
+          </div>
+          <input id="krw" type="range" min="0.01" max="0.6" step="0.001" value="0.1" />
+          <div class="bar-track" id="krwTrack"><div class="bar-ok"></div><div class="bar-knob"></div></div>
+          <div class="bounds" id="krwBounds"></div>
+        </div>
+
+        <div class="btn-row">
+          <button class="primary" id="btnReset" type="button">База Excel</button>
+          <button id="btnEdges" type="button">Показать границы</button>
+        </div>
+
+        <div class="metric-grid" style="grid-template-columns:1fr; margin-top:0.2rem">
+          <div class="metric">
+            <div class="label">Макс. кратность vs база</div>
+            <div class="value" id="foldNow">1.00×</div>
+            <div class="sub" id="foldHint">по всем точкам профиля M(kin)</div>
+          </div>
+          <div class="metric">
+            <div class="label">max(M) / min(M)</div>
+            <div class="value" id="spanNow">—</div>
+            <div class="sub">размах подвижности текущего сценария</div>
+          </div>
+        </div>
+      </aside>
+
+      <main class="charts">
+        <section class="panel chart-card">
+          <div class="chart-title">
+            <h3>Профиль подвижности M(kin)</h3>
+          </div>
+          <p class="chart-note">
+            M = kw/μ<sub>w</sub> + ko/μ<sub>o</sub>, где ko = (1 − S)<sup>ao</sup>, kw = krw · S<sup>aw</sup>, S = kin / max_kin.
+            Чёрная кривая — база из Excel; зелёная — текущие параметры.
+          </p>
+          <div class="canvas-box tall"><canvas id="chartMobility"></canvas></div>
+          <div class="legend-inline">
+            <span><i class="swatch" style="background:var(--series-base)"></i>База (3.05 / 5 / 0.1)</span>
+            <span><i class="swatch" style="background:var(--series-curr)"></i>Текущий сценарий</span>
+          </div>
+        </section>
+
+        <div class="grid-2">
+          <section class="panel chart-card">
+            <div class="chart-title"><h3>Кратность M / M<sub>base</sub> вдоль kin</h3></div>
+            <p class="chart-note">
+              По каждой точке kin: во сколько раз текущая подвижность больше или меньше базовой.
+              Красная зона — выход за предел 3×.
+            </p>
+            <div class="canvas-box"><canvas id="chartFold"></canvas></div>
+          </section>
+
+          <section class="panel chart-card">
+            <div class="chart-title"><h3>Границы OAT (±3×)</h3></div>
+            <p class="chart-note">
+              Диапазоны one-at-a-time при фиксированных остальных параметрах на базе.
+            </p>
+            <div class="canvas-box"><canvas id="chartBounds"></canvas></div>
+          </section>
+        </div>
+
+        <section class="panel chart-card">
+          <div class="chart-title"><h3>Tornado: вклад параметров на краях диапазона</h3></div>
+          <p class="chart-note">
+            Для каждого параметра — максимальная кратность профиля M на нижней и верхней границе чувствительности
+            (при остальных параметрах = база). Чем длиннее бар, тем сильнее влияние на краю.
+          </p>
+          <div class="canvas-box" style="height:280px"><canvas id="chartTornado"></canvas></div>
+        </section>
+
+        <section class="panel">
+          <h2>Сводка границ</h2>
+          <div class="metric-grid" id="summaryCards"></div>
+          <footer>
+            Источник формул: лист Excel «Анализ учета подвижности…».
+            Константы: μ<sub>w</sub> = 0.0043, μ<sub>o</sub> = 0.009, max_kin = 0.198, Δkin = 0.00418 (92 точки, как строки 3–94).
+            Критерий чувствительности: max<sub>i</sub> max(M<sub>i</sub>/Mbase<sub>i</sub>, Mbase<sub>i</sub>/M<sub>i</sub>) ≤ 3.
+          </footer>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <script>
+    const CONST = {
+      MU_W: 0.0043,
+      MU_O: 0.009,
+      MAX_KIN: 0.198,
+      DF: 0.00418,
+      N: 92,
+    };
+
+    const BASE = { ao: 3.05, aw: 5.0, krw: 0.1 };
+
+    // Precomputed OAT bounds (excel-like formulas, fold ≤ 3 vs base)
+    const BOUNDS = {
+      ao:  { lo: 1.691, hi: 4.761, min: 0.5, max: 7,   color: "#c45c26" },
+      aw:  { lo: 3.317, hi: 6.683, min: 0.5, max: 9,   color: "#2f5d8c" },
+      krw: { lo: 0.0333, hi: 0.300, min: 0.01, max: 0.6, color: "#7a3e9d" },
+    };
+
+    const KINS = Array.from({ length: CONST.N }, (_, i) => i * CONST.DF);
+
+    function mobilityProfile(ao, aw, krw) {
+      const out = new Array(CONST.N);
+      for (let i = 0; i < CONST.N; i++) {
+        const sn = KINS[i] / CONST.MAX_KIN;
+        const base = 1 - sn;
+        const ko = base > 0 ? Math.pow(base, ao) : 0;
+        const kw = sn > 0 ? krw * Math.pow(sn, aw) : 0;
+        out[i] = kw / CONST.MU_W + ko / CONST.MU_O;
+      }
+      return out;
+    }
+
+    function maxFold(curr, base) {
+      let m = 1;
+      for (let i = 0; i < curr.length; i++) {
+        const r = curr[i] / base[i];
+        const f = r >= 1 ? r : 1 / r;
+        if (f > m) m = f;
+      }
+      return m;
+    }
+
+    function foldSeries(curr, base) {
+      return curr.map((v, i) => v / base[i]);
+    }
+
+    function fmt(x, digits = 3) {
+      if (Math.abs(x) >= 100) return x.toFixed(1);
+      if (Math.abs(x) >= 10) return x.toFixed(2);
+      return x.toFixed(digits);
+    }
+
+    const baseM = mobilityProfile(BASE.ao, BASE.aw, BASE.krw);
+
+    const state = { ao: BASE.ao, aw: BASE.aw, krw: BASE.krw };
+
+    // Charts
+    const commonOpts = {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: "index", intersect: false },
+      plugins: {
+        legend: {
+          labels: { boxWidth: 12, font: { family: "Manrope", size: 12 } },
+        },
+        tooltip: {
+          callbacks: {
+            title(items) {
+              const i = items[0].dataIndex;
+              return `kin = ${KINS[i].toFixed(5)}`;
+            },
+          },
+        },
+      },
+      scales: {
+        x: {
+          title: { display: true, text: "kin", font: { family: "Manrope", weight: "600" } },
+          ticks: { maxTicksLimit: 8, font: { family: "JetBrains Mono", size: 10 } },
+          grid: { color: "rgba(26,36,44,0.06)" },
+        },
+        y: {
+          ticks: { font: { family: "JetBrains Mono", size: 10 } },
+          grid: { color: "rgba(26,36,44,0.06)" },
+        },
+      },
+    };
+
+    const kinLabels = KINS.map((k) => k.toFixed(3));
+
+    const chartMobility = new Chart(document.getElementById("chartMobility"), {
+      type: "line",
+      data: {
+        labels: kinLabels,
+        datasets: [
+          {
+            label: "M база",
+            data: baseM,
+            borderColor: "#1a242c",
+            backgroundColor: "transparent",
+            borderWidth: 2.5,
+            pointRadius: 0,
+            tension: 0.15,
+          },
+          {
+            label: "M текущий",
+            data: baseM.slice(),
+            borderColor: "#0f6e56",
+            backgroundColor: "rgba(15,110,86,0.12)",
+            borderWidth: 2.5,
+            pointRadius: 0,
+            fill: false,
+            tension: 0.15,
+          },
+        ],
+      },
+      options: {
+        ...commonOpts,
+        scales: {
+          ...commonOpts.scales,
+          y: {
+            ...commonOpts.scales.y,
+            title: { display: true, text: "Подвижность M", font: { family: "Manrope", weight: "600" } },
+          },
+        },
+      },
+    });
+
+    const chartFold = new Chart(document.getElementById("chartFold"), {
+      type: "line",
+      data: {
+        labels: kinLabels,
+        datasets: [
+          {
+            label: "M / Mbase",
+            data: baseM.map(() => 1),
+            borderColor: "#0f6e56",
+            backgroundColor: "rgba(15,110,86,0.15)",
+            fill: true,
+            borderWidth: 2,
+            pointRadius: 0,
+            tension: 0.15,
+          },
+          {
+            label: "предел 3×",
+            data: baseM.map(() => 3),
+            borderColor: "#b42318",
+            borderDash: [6, 4],
+            borderWidth: 1.5,
+            pointRadius: 0,
+          },
+          {
+            label: "предел 1/3",
+            data: baseM.map(() => 1 / 3),
+            borderColor: "#b42318",
+            borderDash: [6, 4],
+            borderWidth: 1.5,
+            pointRadius: 0,
+          },
+        ],
+      },
+      options: {
+        ...commonOpts,
+        plugins: {
+          ...commonOpts.plugins,
+          legend: {
+            labels: {
+              boxWidth: 12,
+              font: { family: "Manrope", size: 11 },
+              filter(item) {
+                return item.text !== "предел 1/3";
+              },
+            },
+          },
+        },
+        scales: {
+          ...commonOpts.scales,
+          y: {
+            ...commonOpts.scales.y,
+            type: "logarithmic",
+            min: 0.2,
+            max: 5,
+            title: { display: true, text: "Кратность (log)", font: { family: "Manrope", weight: "600" } },
+          },
+        },
+      },
+    });
+
+    const chartBounds = new Chart(document.getElementById("chartBounds"), {
+      type: "bar",
+      data: {
+        labels: ["ao (C3)", "aw (D3)", "krw (E3)"],
+        datasets: [
+          {
+            label: "Нижняя граница",
+            data: [BOUNDS.ao.lo, BOUNDS.aw.lo, BOUNDS.krw.lo],
+            backgroundColor: ["#f0b090", "#9bb7d4", "#c9a3de"],
+            borderRadius: 8,
+            barPercentage: 0.65,
+          },
+          {
+            label: "База",
+            data: [BASE.ao, BASE.aw, BASE.krw],
+            backgroundColor: ["#c45c26", "#2f5d8c", "#7a3e9d"],
+            borderRadius: 8,
+            barPercentage: 0.65,
+          },
+          {
+            label: "Верхняя граница",
+            data: [BOUNDS.ao.hi, BOUNDS.aw.hi, BOUNDS.krw.hi],
+            backgroundColor: ["#8a3a12", "#1d3f62", "#53286d"],
+            borderRadius: 8,
+            barPercentage: 0.65,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { labels: { boxWidth: 12, font: { family: "Manrope", size: 11 } } },
+          tooltip: {
+            callbacks: {
+              label(ctx) {
+                const label = ctx.dataset.label;
+                const v = ctx.raw;
+                return `${label}: ${fmt(v, ctx.dataIndex === 2 ? 4 : 3)}`;
+              },
+            },
+          },
+        },
+        scales: {
+          x: { ticks: { font: { family: "Manrope", size: 11 } }, grid: { display: false } },
+          y: {
+            title: { display: true, text: "Значение параметра", font: { family: "Manrope", weight: "600" } },
+            ticks: { font: { family: "JetBrains Mono", size: 10 } },
+            grid: { color: "rgba(26,36,44,0.06)" },
+          },
+        },
+      },
+    });
+
+    // Tornado at bounds
+    function foldAt(param, value) {
+      const p = { ...BASE, [param]: value };
+      return maxFold(mobilityProfile(p.ao, p.aw, p.krw), baseM);
+    }
+
+    const tornadoLabels = [
+      "ao низ", "ao верх",
+      "aw низ", "aw верх",
+      "krw низ", "krw верх",
+    ];
+    const tornadoVals = [
+      foldAt("ao", BOUNDS.ao.lo),
+      foldAt("ao", BOUNDS.ao.hi),
+      foldAt("aw", BOUNDS.aw.lo),
+      foldAt("aw", BOUNDS.aw.hi),
+      foldAt("krw", BOUNDS.krw.lo),
+      foldAt("krw", BOUNDS.krw.hi),
+    ];
+    const tornadoColors = [
+      "#f0b090", "#c45c26",
+      "#9bb7d4", "#2f5d8c",
+      "#c9a3de", "#7a3e9d",
+    ];
+
+    const chartTornado = new Chart(document.getElementById("chartTornado"), {
+      type: "bar",
+      data: {
+        labels: tornadoLabels,
+        datasets: [{
+          label: "Макс. кратность M vs база",
+          data: tornadoVals,
+          backgroundColor: tornadoColors,
+          borderRadius: 8,
+          barPercentage: 0.7,
+        }],
+      },
+      options: {
+        indexAxis: "y",
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label(ctx) { return `${ctx.raw.toFixed(3)}×`; },
+            },
+          },
+        },
+        scales: {
+          x: {
+            min: 0,
+            max: 3.2,
+            title: { display: true, text: "Кратность (×)", font: { family: "Manrope", weight: "600" } },
+            ticks: { font: { family: "JetBrains Mono", size: 10 } },
+            grid: { color: "rgba(26,36,44,0.06)" },
+          },
+          y: {
+            ticks: { font: { family: "Manrope", size: 12 } },
+            grid: { display: false },
+          },
+        },
+      },
+    });
+
+    function updateTrack(key) {
+      const b = BOUNDS[key];
+      const el = document.getElementById(key);
+      const track = document.getElementById(key + "Track");
+      const ok = track.querySelector(".bar-ok");
+      const knob = track.querySelector(".bar-knob");
+      const span = b.max - b.min;
+      const left = ((b.lo - b.min) / span) * 100;
+      const width = ((b.hi - b.lo) / span) * 100;
+      const pos = ((Number(el.value) - b.min) / span) * 100;
+      ok.style.left = left + "%";
+      ok.style.width = width + "%";
+      knob.style.left = pos + "%";
+      document.getElementById(key + "Bounds").textContent =
+        `допуск 3×: ${fmt(b.lo, key === "krw" ? 4 : 3)} … ${fmt(b.hi, key === "krw" ? 4 : 3)}`;
+    }
+
+    function inBounds(key, v) {
+      return v >= BOUNDS[key].lo - 1e-9 && v <= BOUNDS[key].hi + 1e-9;
+    }
+
+    function renderSummary() {
+      const cards = [
+        { key: "ao", title: "C3 · ao", unit: "" },
+        { key: "aw", title: "D3 · aw", unit: "" },
+        { key: "krw", title: "E3 · krw", unit: "" },
+      ];
+      document.getElementById("summaryCards").innerHTML = cards.map(({ key, title }) => {
+        const b = BOUNDS[key];
+        const v = state[key];
+        const ok = inBounds(key, v);
+        return `
+          <div class="metric">
+            <div class="label">${title}</div>
+            <div class="value">${fmt(v, key === "krw" ? 4 : 3)}</div>
+            <div class="sub">${fmt(b.lo, key === "krw" ? 4 : 3)} → ${fmt(b.hi, key === "krw" ? 4 : 3)}
+              · <strong style="color:${ok ? "var(--ok)" : "var(--bad)"}">${ok ? "в допуске" : "вне допуска"}</strong>
+            </div>
+          </div>`;
+      }).join("");
+    }
+
+    function update() {
+      state.ao = Number(document.getElementById("ao").value);
+      state.aw = Number(document.getElementById("aw").value);
+      state.krw = Number(document.getElementById("krw").value);
+
+      document.getElementById("aoVal").textContent = state.ao.toFixed(2);
+      document.getElementById("awVal").textContent = state.aw.toFixed(2);
+      document.getElementById("krwVal").textContent = state.krw.toFixed(3);
+
+      ["ao", "aw", "krw"].forEach(updateTrack);
+
+      const curr = mobilityProfile(state.ao, state.aw, state.krw);
+      const fold = maxFold(curr, baseM);
+      const ratios = foldSeries(curr, baseM);
+      const span = Math.max(...curr) / Math.min(...curr);
+
+      chartMobility.data.datasets[1].data = curr;
+      chartMobility.update("none");
+
+      chartFold.data.datasets[0].data = ratios;
+      const yMax = Math.max(5, Math.ceil(fold * 1.15 * 10) / 10);
+      chartFold.options.scales.y.max = yMax;
+      chartFold.options.scales.y.min = Math.min(0.2, 1 / yMax);
+      chartFold.update("none");
+
+      const foldEl = document.getElementById("foldNow");
+      foldEl.textContent = fold.toFixed(2) + "×";
+      foldEl.style.color = fold <= 3 ? "var(--ok)" : "var(--bad)";
+      document.getElementById("spanNow").textContent = span.toFixed(2) + "×";
+
+      const allOk = fold <= 3;
+      const paramFlags = ["ao", "aw", "krw"].map((k) => ({ k, ok: inBounds(k, state[k]) }));
+      document.getElementById("statusRow").innerHTML = `
+        <span class="pill ${allOk ? "ok" : "bad"}"><span class="dot"></span>${allOk ? "Сценарий в допуске ≤ 3×" : "Сценарий вне допуска > 3×"}</span>
+        ${paramFlags.map((p) =>
+          `<span class="pill ${p.ok ? "ok" : "warn"}"><span class="dot"></span>${p.k} ${p.ok ? "OAT OK" : "вне OAT"}</span>`
+        ).join("")}
+        <span class="pill">база ao=${BASE.ao}, aw=${BASE.aw}, krw=${BASE.krw}</span>
+      `;
+
+      renderSummary();
+    }
+
+    ["ao", "aw", "krw"].forEach((id) => {
+      document.getElementById(id).addEventListener("input", update);
+    });
+
+    document.getElementById("btnReset").addEventListener("click", () => {
+      document.getElementById("ao").value = BASE.ao;
+      document.getElementById("aw").value = BASE.aw;
+      document.getElementById("krw").value = BASE.krw;
+      update();
+    });
+
+    let edgeToggle = 0;
+    document.getElementById("btnEdges").addEventListener("click", () => {
+      const edges = [
+        { ao: BOUNDS.ao.lo, aw: BASE.aw, krw: BASE.krw },
+        { ao: BOUNDS.ao.hi, aw: BASE.aw, krw: BASE.krw },
+        { ao: BASE.ao, aw: BOUNDS.aw.lo, krw: BASE.krw },
+        { ao: BASE.ao, aw: BOUNDS.aw.hi, krw: BASE.krw },
+        { ao: BASE.ao, aw: BASE.aw, krw: BOUNDS.krw.lo },
+        { ao: BASE.ao, aw: BASE.aw, krw: BOUNDS.krw.hi },
+      ];
+      const e = edges[edgeToggle % edges.length];
+      edgeToggle++;
+      document.getElementById("ao").value = e.ao;
+      document.getElementById("aw").value = e.aw;
+      document.getElementById("krw").value = e.krw;
+      update();
+    });
+
+    update();
+  </script>
+</body>
+</html>
