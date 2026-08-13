@@ -184,7 +184,7 @@
     <div class="brand"><span class="brand-mark"></span>Corey Bounds</div>
     <p class="lead">
       Оценка чувствительности параметров Corey (α<sub>o</sub>, α<sub>w</sub>, krw) к полной подвижности M.
-      Критерий: профиль M не отличается от базы более чем в 3 раза.
+      Критерий кратности настраивается на стартовой вкладке: сравнение с базой или размах max(M)/min(M) по текущему графику.
     </p>
 
     <nav class="tabs" role="tablist">
@@ -236,14 +236,31 @@
             <div class="bar-track" id="krwTrack"><div class="bar-ok"></div><div class="bar-knob"></div></div>
             <div class="bounds" id="krwBounds"></div>
           </div>
+          <div class="field" style="margin:0.15rem 0 0.35rem">
+            <label for="sensFoldLimit">Порог кратности</label>
+            <input type="number" id="sensFoldLimit" step="0.1" min="1.1" value="3" />
+          </div>
+
+          <div class="field" style="margin-bottom:0.55rem">
+            <label>Режим расчёта кратности</label>
+            <div class="seg" id="foldModeSeg">
+              <button type="button" data-mode="vsBase" class="active">vs база</button>
+              <button type="button" data-mode="span">max/min M</button>
+            </div>
+            <p class="hint" id="foldModeHint" style="margin:0.35rem 0 0">
+              Точечное сравнение текущего профиля с базовым: max<sub>i</sub> max(M<sub>i</sub>/Mbase<sub>i</sub>, Mbase<sub>i</sub>/M<sub>i</sub>).
+            </p>
+          </div>
+
           <div class="btn-row">
             <button class="primary" id="btnReset" type="button">База</button>
             <button id="btnEdges" type="button">Границы</button>
+            <button id="btnRecomputeOat" type="button">Пересчитать OAT</button>
           </div>
           <div class="metric" style="margin-top:0.2rem">
-            <div class="label">Макс. кратность vs база</div>
+            <div class="label" id="foldNowLabel">Макс. кратность vs база</div>
             <div class="value" id="foldNow">1.00×</div>
-            <div class="sub">по всем точкам профиля M(kin)</div>
+            <div class="sub" id="foldNowSub">по всем точкам профиля M(kin)</div>
           </div>
           <div class="metric">
             <div class="label">max(M) / min(M)</div>
@@ -260,13 +277,13 @@
           </section>
           <div class="grid-2">
             <section class="panel">
-              <h3>Кратность M / Mbase</h3>
-              <p class="chart-note">Красные линии — предел 3× и 1/3.</p>
+              <h3 id="foldChartTitle">Кратность M / Mbase</h3>
+              <p class="chart-note" id="foldChartNote">Красные линии — порог кратности и обратный предел.</p>
               <div class="canvas-box"><canvas id="chartFold"></canvas></div>
             </section>
             <section class="panel">
-              <h3>Границы OAT (±3×)</h3>
-              <p class="chart-note">One-at-a-time при фиксированных остальных на базе.</p>
+              <h3 id="oatChartTitle">Границы OAT</h3>
+              <p class="chart-note" id="oatChartNote">One-at-a-time при фиксированных остальных на базе.</p>
               <div class="canvas-box"><canvas id="chartBounds"></canvas></div>
             </section>
           </div>
@@ -299,6 +316,7 @@
               <option value="end">M на конце kin</option>
               <option value="at">M при выбранном kin</option>
               <option value="fold">Кратность vs база (max fold)</option>
+              <option value="span">max(M)/min(M) текущего профиля</option>
             </select>
           </div>
           <div class="field" id="cubeKinField" style="display:none">
@@ -463,6 +481,7 @@
       MAX_KIN: DEFAULTS.MAX_KIN,
       DF: DEFAULTS.DF,
       foldLimit: DEFAULTS.foldLimit,
+      foldMode: "vsBase", // "vsBase" | "span"
       kins: [],
       BASE: { ao: DEFAULTS.ao, aw: DEFAULTS.aw, krw: DEFAULTS.krw },
       BOUNDS: {
@@ -512,6 +531,7 @@
       if (metric === "end") return m[m.length - 1];
       if (metric === "at") return m[Math.min(Math.max(kinIdx, 0), m.length - 1)];
       if (metric === "fold") return maxFold(m, model.baseM);
+      if (metric === "span") return spanRatio(m);
       // mean
       let s = 0;
       for (const v of m) s += v;
@@ -530,6 +550,25 @@
       return m;
     }
 
+    function spanRatio(curr) {
+      let mn = Infinity, mx = -Infinity;
+      for (const v of curr) {
+        if (!(v > 0)) continue;
+        if (v < mn) mn = v;
+        if (v > mx) mx = v;
+      }
+      if (!(mx > 0) || !(mn > 0) || !Number.isFinite(mn) || !Number.isFinite(mx)) return Infinity;
+      return mx / mn;
+    }
+
+    function criterionValue(curr) {
+      return model.foldMode === "span" ? spanRatio(curr) : maxFold(curr, model.baseM);
+    }
+
+    function criterionOk(curr) {
+      return criterionValue(curr) <= model.foldLimit + 1e-9;
+    }
+
     function fmt(x, digits = 3) {
       if (!Number.isFinite(x)) return "—";
       if (Math.abs(x) >= 100) return x.toFixed(1);
@@ -540,8 +579,6 @@
     function findOatBound(param, direction) {
       // direction: 'lo' expand down from base, 'hi' expand up
       const base = model.BASE;
-      const baseM = model.baseM;
-      const limit = model.foldLimit;
       const ranges = {
         ao: [0.2, 10],
         aw: [0.2, 12],
@@ -552,8 +589,15 @@
 
       const ok = (x) => {
         const p = { ...base, [param]: x };
-        return maxFold(mobilityProfile(p.ao, p.aw, p.krw), baseM) <= limit + 1e-9;
+        return criterionOk(mobilityProfile(p.ao, p.aw, p.krw));
       };
+
+      // If base itself fails criterion, shrink toward values that improve metric
+      if (!ok(x0)) {
+        // still return a narrow interval around base for UI
+        const pad = param === "krw" ? 0.01 : 0.05;
+        return direction === "lo" ? Math.max(minV, x0 - pad) : Math.min(maxV, x0 + pad);
+      }
 
       if (direction === "lo") {
         if (ok(minV)) return minV;
@@ -723,6 +767,34 @@
       return v >= b.lo - 1e-9 && v <= b.hi + 1e-9;
     }
 
+    function updateModeLabels() {
+      const span = model.foldMode === "span";
+      document.getElementById("foldNowLabel").textContent = span
+        ? "Кратность max(M)/min(M)"
+        : "Макс. кратность vs база";
+      document.getElementById("foldNowSub").textContent = span
+        ? "по точкам текущего графика M(kin)"
+        : "точечно: текущий профиль vs база";
+      document.getElementById("foldModeHint").innerHTML = span
+        ? "Размах одного (текущего) профиля: <strong>max(M) / min(M)</strong> по всем точкам kin. Базовый график не сравнивается."
+        : "Точечное сравнение текущего профиля с базовым: max<sub>i</sub> max(M<sub>i</sub>/Mbase<sub>i</sub>, Mbase<sub>i</sub>/M<sub>i</sub>).";
+      document.getElementById("foldChartTitle").textContent = span
+        ? "Нормировка M / min(M)"
+        : "Кратность M / Mbase";
+      document.getElementById("foldChartNote").textContent = span
+        ? "Текущий профиль, делённый на свой минимум. Красная линия — порог кратности."
+        : "Красные линии — порог кратности и обратный предел.";
+      document.getElementById("oatChartTitle").textContent = `Границы OAT (±${fmt(model.foldLimit, 1)}×)`;
+      document.getElementById("oatChartNote").textContent = span
+        ? `OAT: параметр в допуске, если max(M)/min(M) ≤ ${fmt(model.foldLimit, 1)} на текущем профиле.`
+        : `OAT: параметр в допуске, если кратность vs база ≤ ${fmt(model.foldLimit, 1)}.`;
+
+      // sync seg buttons
+      document.querySelectorAll("#foldModeSeg button").forEach((b) => {
+        b.classList.toggle("active", b.dataset.mode === model.foldMode);
+      });
+    }
+
     function updateSensitivity() {
       state.ao = Number(document.getElementById("ao").value);
       state.aw = Number(document.getElementById("aw").value);
@@ -735,22 +807,41 @@
 
       const labels = model.kins.map((k) => k.toFixed(3));
       const curr = mobilityProfile(state.ao, state.aw, state.krw);
-      const fold = maxFold(curr, model.baseM);
-      const ratios = curr.map((v, i) => (model.baseM[i] > 0 ? v / model.baseM[i] : 1));
-      const span = Math.max(...curr) / Math.min(...curr);
+      const span = spanRatio(curr);
+      const foldMetric = criterionValue(curr);
+      const vsBase = maxFold(curr, model.baseM);
 
       chartMobility.data.labels = labels;
       chartMobility.data.datasets[0].data = model.baseM;
       chartMobility.data.datasets[1].data = curr;
       chartMobility.update("none");
 
+      const mn = Math.min(...curr.filter((v) => v > 0));
       chartFold.data.labels = labels;
-      chartFold.data.datasets[0].data = ratios;
-      chartFold.data.datasets[1].data = labels.map(() => model.foldLimit);
-      chartFold.data.datasets[2].data = labels.map(() => 1 / model.foldLimit);
-      const yMax = Math.max(model.foldLimit * 1.5, Math.ceil(fold * 1.15 * 10) / 10);
-      chartFold.options.scales.y.max = yMax;
-      chartFold.options.scales.y.min = Math.min(1 / model.foldLimit / 1.5, 1 / yMax);
+      if (model.foldMode === "span") {
+        chartFold.data.datasets[0].label = "M / min(M)";
+        chartFold.data.datasets[0].data = curr.map((v) => (mn > 0 ? v / mn : 1));
+        chartFold.data.datasets[1].label = `порог ${fmt(model.foldLimit, 1)}×`;
+        chartFold.data.datasets[1].data = labels.map(() => model.foldLimit);
+        chartFold.data.datasets[2].data = labels.map(() => null);
+        const yMax = Math.max(model.foldLimit * 1.2, Math.ceil(span * 1.1 * 10) / 10, 2);
+        chartFold.options.scales.y.type = "linear";
+        chartFold.options.scales.y.min = 0;
+        chartFold.options.scales.y.max = yMax;
+        chartFold.options.scales.y.title.text = "M / min(M)";
+      } else {
+        chartFold.data.datasets[0].label = "M / Mbase";
+        chartFold.data.datasets[0].data = curr.map((v, i) => (model.baseM[i] > 0 ? v / model.baseM[i] : 1));
+        chartFold.data.datasets[1].label = `порог ${fmt(model.foldLimit, 1)}×`;
+        chartFold.data.datasets[1].data = labels.map(() => model.foldLimit);
+        chartFold.data.datasets[2].label = `1/${fmt(model.foldLimit, 1)}`;
+        chartFold.data.datasets[2].data = labels.map(() => 1 / model.foldLimit);
+        const yMax = Math.max(model.foldLimit * 1.5, Math.ceil(vsBase * 1.15 * 10) / 10);
+        chartFold.options.scales.y.type = "logarithmic";
+        chartFold.options.scales.y.max = yMax;
+        chartFold.options.scales.y.min = Math.min(1 / model.foldLimit / 1.5, 1 / yMax);
+        chartFold.options.scales.y.title.text = "Кратность (log)";
+      }
       chartFold.update("none");
 
       const B = model.BOUNDS, Base = model.BASE;
@@ -759,27 +850,30 @@
       chartBounds.data.datasets[2].data = [B.ao.hi, B.aw.hi, B.krw.hi];
       chartBounds.update("none");
 
-      const foldAt = (param, value) => {
+      const critAt = (param, value) => {
         const p = { ...Base, [param]: value };
-        return maxFold(mobilityProfile(p.ao, p.aw, p.krw), model.baseM);
+        return criterionValue(mobilityProfile(p.ao, p.aw, p.krw));
       };
       chartTornado.data.datasets[0].data = [
-        foldAt("ao", B.ao.lo), foldAt("ao", B.ao.hi),
-        foldAt("aw", B.aw.lo), foldAt("aw", B.aw.hi),
-        foldAt("krw", B.krw.lo), foldAt("krw", B.krw.hi),
+        critAt("ao", B.ao.lo), critAt("ao", B.ao.hi),
+        critAt("aw", B.aw.lo), critAt("aw", B.aw.hi),
+        critAt("krw", B.krw.lo), critAt("krw", B.krw.hi),
       ];
+      chartTornado.data.datasets[0].label = model.foldMode === "span" ? "max/min M" : "fold vs база";
       chartTornado.options.scales.x.max = Math.max(model.foldLimit + 0.2, ...chartTornado.data.datasets[0].data) * 1.05;
       chartTornado.update("none");
 
       const foldEl = document.getElementById("foldNow");
-      foldEl.textContent = fold.toFixed(2) + "×";
-      foldEl.style.color = fold <= model.foldLimit ? "var(--ok)" : "var(--bad)";
+      foldEl.textContent = foldMetric.toFixed(2) + "×";
+      foldEl.style.color = foldMetric <= model.foldLimit ? "var(--ok)" : "var(--bad)";
       document.getElementById("spanNow").textContent = span.toFixed(2) + "×";
 
-      const allOk = fold <= model.foldLimit;
+      const allOk = foldMetric <= model.foldLimit;
       const paramFlags = ["ao", "aw", "krw"].map((k) => ({ k, ok: inBounds(k, state[k]) }));
+      const modeTag = model.foldMode === "span" ? "режим max/min" : "режим vs база";
       document.getElementById("statusRow").innerHTML = `
         <span class="pill ${allOk ? "ok" : "bad"}"><span class="dot"></span>${allOk ? `Сценарий ≤ ${model.foldLimit}×` : `Сценарий > ${model.foldLimit}×`}</span>
+        <span class="pill">${modeTag}</span>
         ${paramFlags.map((p) => `<span class="pill ${p.ok ? "ok" : "warn"}"><span class="dot"></span>${p.k} ${p.ok ? "OAT OK" : "вне OAT"}</span>`).join("")}
         <span class="pill">база αo=${Base.ao}, αw=${Base.aw}, krw=${Base.krw}</span>
       `;
@@ -795,7 +889,27 @@
       }).join("");
 
       document.getElementById("footerNote").innerHTML =
-        `μw=${model.MU_W}, μo=${model.MU_O}, max_kin=${model.MAX_KIN}, N=${model.kins.length}. Критерий: max fold ≤ ${model.foldLimit}.`;
+        `μw=${model.MU_W}, μo=${model.MU_O}, max_kin=${model.MAX_KIN}, N=${model.kins.length}. ` +
+        `Критерий (${model.foldMode === "span" ? "max(M)/min(M)" : "vs база"}): ≤ ${model.foldLimit}.`;
+
+      updateModeLabels();
+    }
+
+    function applyFoldLimitFromUI(sourceId) {
+      const el = document.getElementById(sourceId);
+      const v = Number(el.value);
+      if (!(v > 1)) return;
+      model.foldLimit = v;
+      document.getElementById("sensFoldLimit").value = v;
+      document.getElementById("inFold").value = v;
+      updateSensitivity();
+    }
+
+    function recomputeOatAndRefresh() {
+      recomputeBounds();
+      syncSlidersFromBounds();
+      updateSensitivity();
+      if (cubeUI.ready) rebuildCube();
     }
 
     // ---- Hypercube ----
@@ -995,6 +1109,7 @@
       document.getElementById("inAw").value = model.BASE.aw;
       document.getElementById("inKrw").value = model.BASE.krw;
       document.getElementById("inFold").value = model.foldLimit;
+      document.getElementById("sensFoldLimit").value = model.foldLimit;
       document.getElementById("inKinList").value = model.kins.map((k) => k.toFixed(5)).join("\n");
       document.getElementById("kinCount").textContent = String(model.kins.length);
       document.getElementById("kinRange").textContent =
@@ -1040,6 +1155,7 @@
       model.MAX_KIN = maxKin;
       model.DF = mode === "auto" ? df : (kins[1] - kins[0] || df);
       model.foldLimit = fold;
+      document.getElementById("sensFoldLimit").value = fold;
       model.kins = kins;
       model.BASE = { ao, aw, krw };
       model.baseM = mobilityProfile(ao, aw, krw);
@@ -1054,7 +1170,7 @@
         rebuildCube();
       }
       document.getElementById("inputsStatus").textContent =
-        `Применено: N=${kins.length}, OAT αo=[${fmt(model.BOUNDS.ao.lo)}…${fmt(model.BOUNDS.ao.hi)}], αw=[${fmt(model.BOUNDS.aw.lo)}…${fmt(model.BOUNDS.aw.hi)}], krw=[${fmt(model.BOUNDS.krw.lo,4)}…${fmt(model.BOUNDS.krw.hi,4)}].`;
+        `Применено: N=${kins.length}, режим=${model.foldMode}, порог=${fold}×, OAT αo=[${fmt(model.BOUNDS.ao.lo)}…${fmt(model.BOUNDS.ao.hi)}], αw=[${fmt(model.BOUNDS.aw.lo)}…${fmt(model.BOUNDS.aw.hi)}], krw=[${fmt(model.BOUNDS.krw.lo,4)}…${fmt(model.BOUNDS.krw.hi,4)}].`;
     }
 
     function resetInputsToExcel() {
@@ -1071,6 +1187,7 @@
       state.ao = DEFAULTS.ao; state.aw = DEFAULTS.aw; state.krw = DEFAULTS.krw;
       document.getElementById("kinMode").value = "auto";
       // use known precomputed bounds for default excel case (faster + exact prior)
+      model.foldMode = "vsBase";
       model.BOUNDS = {
         ao:  { lo: 1.691, hi: 4.761, min: 0.5, max: 7 },
         aw:  { lo: 3.317, hi: 6.683, min: 0.5, max: 9 },
@@ -1100,6 +1217,26 @@
     // ---- Wire events ----
     ["ao", "aw", "krw"].forEach((id) => {
       document.getElementById(id).addEventListener("input", updateSensitivity);
+    });
+
+    document.getElementById("sensFoldLimit").addEventListener("change", () => {
+      applyFoldLimitFromUI("sensFoldLimit");
+      recomputeOatAndRefresh();
+    });
+    document.getElementById("inFold").addEventListener("change", () => {
+      applyFoldLimitFromUI("inFold");
+    });
+
+    document.getElementById("foldModeSeg").addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-mode]");
+      if (!btn) return;
+      model.foldMode = btn.dataset.mode;
+      updateModeLabels();
+      recomputeOatAndRefresh();
+    });
+
+    document.getElementById("btnRecomputeOat").addEventListener("click", () => {
+      recomputeOatAndRefresh();
     });
 
     document.getElementById("btnReset").addEventListener("click", () => {
