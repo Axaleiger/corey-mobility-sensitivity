@@ -272,7 +272,7 @@
         <main class="charts">
           <section class="panel">
             <h3>Профиль подвижности M(kin)</h3>
-            <p class="chart-note">M = kw/μw + ko/μo · чёрная — база, зелёная — текущий сценарий.</p>
+            <p class="chart-note" id="chartMobilityNote">M = kw/μw + ko/μo · чёрная — база, зелёная — текущий сценарий. Красные маркеры — точки расчёта кратности.</p>
             <div class="canvas-box tall"><canvas id="chartMobility"></canvas></div>
           </section>
           <div class="grid-2">
@@ -561,6 +561,41 @@
       return mx / mn;
     }
 
+    function findSpanPoints(curr) {
+      let iMin = -1, iMax = -1, mn = Infinity, mx = -Infinity;
+      for (let i = 0; i < curr.length; i++) {
+        const v = curr[i];
+        if (!(v > 0)) continue;
+        if (v < mn) { mn = v; iMin = i; }
+        if (v > mx) { mx = v; iMax = i; }
+      }
+      return { iMin, iMax, mn, mx };
+    }
+
+    function findMaxFoldPoint(curr, base) {
+      let bestI = -1, bestF = 1, bestR = 1;
+      const n = Math.min(curr.length, base.length);
+      for (let i = 0; i < n; i++) {
+        if (!(base[i] > 0) || !(curr[i] > 0)) continue;
+        const r = curr[i] / base[i];
+        const f = r >= 1 ? r : 1 / r;
+        if (f > bestF) { bestF = f; bestI = i; bestR = r; }
+      }
+      return { i: bestI, fold: bestF, ratio: bestR };
+    }
+
+    function sparseSeries(n, points) {
+      // points: [{i, y, tip, color}]
+      const data = Array(n).fill(null);
+      const colors = Array(n).fill("#b42318");
+      for (const p of points) {
+        if (p.i < 0 || p.i >= n) continue;
+        data[p.i] = p.y;
+        colors[p.i] = p.color || "#b42318";
+      }
+      return { data, colors };
+    }
+
     function criterionValue(curr) {
       return model.foldMode === "span" ? spanRatio(curr) : maxFold(curr, model.baseM);
     }
@@ -670,11 +705,36 @@
       chartMobility = new Chart(document.getElementById("chartMobility"), {
         type: "line",
         data: { labels: [], datasets: [
-          { label: "M база", data: [], borderColor: "#1a242c", borderWidth: 2.5, pointRadius: 0, tension: 0.15 },
-          { label: "M текущий", data: [], borderColor: "#0f6e56", borderWidth: 2.5, pointRadius: 0, tension: 0.15 },
+          { label: "M база", data: [], borderColor: "#1a242c", borderWidth: 2, pointRadius: 0, tension: 0.15 },
+          {
+            label: "M текущий", data: [], borderColor: "#0f6e56", borderWidth: 2,
+            pointRadius: 2.5, pointHoverRadius: 5, pointBackgroundColor: "#0f6e56",
+            pointBorderColor: "#fff", pointBorderWidth: 1, tension: 0.15,
+          },
+          {
+            label: "Точки кратности", data: [], showLine: false,
+            pointRadius: 8, pointHoverRadius: 10, pointStyle: "rectRot",
+            pointBackgroundColor: "#b42318", pointBorderColor: "#fff", pointBorderWidth: 2,
+            order: 0,
+          },
         ]},
         options: {
           ...commonOpts,
+          plugins: {
+            ...commonOpts.plugins,
+            tooltip: {
+              callbacks: {
+                title(items) {
+                  const i = items[0].dataIndex;
+                  return `kin = ${model.kins[i]?.toFixed(5) ?? i}`;
+                },
+                afterBody(items) {
+                  const tip = items[0]?.raw?._tip;
+                  return tip ? [String(tip)] : [];
+                },
+              },
+            },
+          },
           scales: { ...commonOpts.scales, y: { ...commonOpts.scales.y, title: { display: true, text: "Подвижность M", font: { family: "Manrope", weight: "600" } } } },
         },
       });
@@ -682,13 +742,32 @@
       chartFold = new Chart(document.getElementById("chartFold"), {
         type: "line",
         data: { labels: [], datasets: [
-          { label: "M / Mbase", data: [], borderColor: "#0f6e56", backgroundColor: "rgba(15,110,86,0.15)", fill: true, borderWidth: 2, pointRadius: 0, tension: 0.15 },
+          {
+            label: "M / Mbase", data: [], borderColor: "#0f6e56", backgroundColor: "rgba(15,110,86,0.12)",
+            fill: true, borderWidth: 2, pointRadius: 2.5, pointHoverRadius: 5,
+            pointBackgroundColor: "#0f6e56", pointBorderColor: "#fff", pointBorderWidth: 1, tension: 0.15,
+          },
           { label: "предел 3×", data: [], borderColor: "#b42318", borderDash: [6, 4], borderWidth: 1.5, pointRadius: 0 },
           { label: "предел 1/3", data: [], borderColor: "#b42318", borderDash: [6, 4], borderWidth: 1.5, pointRadius: 0 },
+          {
+            label: "Точки кратности", data: [], showLine: false,
+            pointRadius: 8, pointHoverRadius: 10, pointStyle: "rectRot",
+            pointBackgroundColor: "#b42318", pointBorderColor: "#fff", pointBorderWidth: 2,
+            order: 0,
+          },
         ]},
         options: {
           ...commonOpts,
-          plugins: { ...commonOpts.plugins, legend: { labels: { boxWidth: 12, font: { family: "Manrope", size: 11 }, filter: (i) => i.text !== "предел 1/3" } } },
+          plugins: {
+            ...commonOpts.plugins,
+            legend: {
+              labels: {
+                boxWidth: 12,
+                font: { family: "Manrope", size: 11 },
+                filter: (i) => !String(i.text || "").startsWith("1/") && i.text !== "предел 1/3",
+              },
+            },
+          },
           scales: {
             ...commonOpts.scales,
             y: { ...commonOpts.scales.y, type: "logarithmic", min: 0.2, max: 5, title: { display: true, text: "Кратность (log)", font: { family: "Manrope", weight: "600" } } },
@@ -772,24 +851,20 @@
       document.getElementById("foldNowLabel").textContent = span
         ? "Кратность max(M)/min(M)"
         : "Макс. кратность vs база";
-      document.getElementById("foldNowSub").textContent = span
-        ? "по точкам текущего графика M(kin)"
-        : "точечно: текущий профиль vs база";
       document.getElementById("foldModeHint").innerHTML = span
-        ? "Размах одного (текущего) профиля: <strong>max(M) / min(M)</strong> по всем точкам kin. Базовый график не сравнивается."
-        : "Точечное сравнение текущего профиля с базовым: max<sub>i</sub> max(M<sub>i</sub>/Mbase<sub>i</sub>, Mbase<sub>i</sub>/M<sub>i</sub>).";
+        ? "Размах одного (текущего) профиля: <strong>max(M) / min(M)</strong> по всем точкам kin. Базовый график не сравнивается. На графике отмечены точки min и max."
+        : "Точечное сравнение текущего профиля с базовым: max<sub>i</sub> max(M<sub>i</sub>/Mbase<sub>i</sub>, Mbase<sub>i</sub>/M<sub>i</sub>). На графике отмечена точка с максимальным fold.";
       document.getElementById("foldChartTitle").textContent = span
         ? "Нормировка M / min(M)"
         : "Кратность M / Mbase";
       document.getElementById("foldChartNote").textContent = span
-        ? "Текущий профиль, делённый на свой минимум. Красная линия — порог кратности."
-        : "Красные линии — порог кратности и обратный предел.";
+        ? "Все точки профиля + маркеры min/max. Красная линия — порог кратности."
+        : "Все точки отношения + маркер экстремума fold. Красные линии — порог и обратный предел.";
       document.getElementById("oatChartTitle").textContent = `Границы OAT (±${fmt(model.foldLimit, 1)}×)`;
       document.getElementById("oatChartNote").textContent = span
         ? `OAT: параметр в допуске, если max(M)/min(M) ≤ ${fmt(model.foldLimit, 1)} на текущем профиле.`
         : `OAT: параметр в допуске, если кратность vs база ≤ ${fmt(model.foldLimit, 1)}.`;
 
-      // sync seg buttons
       document.querySelectorAll("#foldModeSeg button").forEach((b) => {
         b.classList.toggle("active", b.dataset.mode === model.foldMode);
       });
@@ -807,35 +882,90 @@
 
       const labels = model.kins.map((k) => k.toFixed(3));
       const curr = mobilityProfile(state.ao, state.aw, state.krw);
-      const span = spanRatio(curr);
+      const spanPts = findSpanPoints(curr);
+      const span = (spanPts.mx > 0 && spanPts.mn > 0) ? spanPts.mx / spanPts.mn : Infinity;
+      const foldHit = findMaxFoldPoint(curr, model.baseM);
       const foldMetric = criterionValue(curr);
-      const vsBase = maxFold(curr, model.baseM);
+      const vsBase = foldHit.fold;
+
+      // Key points for кратность
+      let keyMob = [];
+      let keyFold = [];
+      let keyDesc = "";
+      if (model.foldMode === "span") {
+        keyMob = [
+          { i: spanPts.iMin, y: spanPts.mn, color: "#2f5d8c", tip: `min M = ${fmt(spanPts.mn, 3)}` },
+          { i: spanPts.iMax, y: spanPts.mx, color: "#b42318", tip: `max M = ${fmt(spanPts.mx, 3)}` },
+        ];
+        const mnNorm = 1;
+        const mxNorm = spanPts.mn > 0 ? spanPts.mx / spanPts.mn : null;
+        keyFold = [
+          { i: spanPts.iMin, y: mnNorm, color: "#2f5d8c" },
+          { i: spanPts.iMax, y: mxNorm, color: "#b42318" },
+        ];
+        keyDesc = `min@kin=${fmt(model.kins[spanPts.iMin], 4)} (M=${fmt(spanPts.mn, 2)}), max@kin=${fmt(model.kins[spanPts.iMax], 4)} (M=${fmt(spanPts.mx, 2)}) → ${fmt(span, 2)}×`;
+      } else {
+        const i = foldHit.i;
+        keyMob = [
+          { i, y: curr[i], color: "#b42318", tip: `M=${fmt(curr[i], 3)}, Mbase=${fmt(model.baseM[i], 3)}, fold=${fmt(foldHit.fold, 2)}×` },
+        ];
+        keyFold = [
+          { i, y: foldHit.ratio, color: "#b42318" },
+        ];
+        keyDesc = `экстремум fold @ kin=${fmt(model.kins[i], 4)}: M=${fmt(curr[i], 2)}, Mbase=${fmt(model.baseM[i], 2)}, ${fmt(foldHit.fold, 2)}×`;
+      }
+
+      const mobKeys = sparseSeries(curr.length, keyMob);
+      const foldKeys = sparseSeries(curr.length, keyFold);
 
       chartMobility.data.labels = labels;
       chartMobility.data.datasets[0].data = model.baseM;
+      chartMobility.data.datasets[0].pointRadius = model.baseM.map((_, i) =>
+        model.foldMode === "vsBase" && keyMob.some((p) => p.i === i) ? 6 : 0
+      );
+      chartMobility.data.datasets[0].pointBackgroundColor = "#1a242c";
+      chartMobility.data.datasets[0].pointBorderColor = "#fff";
+      chartMobility.data.datasets[0].pointBorderWidth = 2;
       chartMobility.data.datasets[1].data = curr;
+      chartMobility.data.datasets[1].pointRadius = curr.map((_, i) =>
+        keyMob.some((p) => p.i === i) ? 0 : 2.5
+      );
+      chartMobility.data.datasets[2].data = mobKeys.data;
+      chartMobility.data.datasets[2].pointBackgroundColor = mobKeys.colors;
       chartMobility.update("none");
 
-      const mn = Math.min(...curr.filter((v) => v > 0));
+      const mn = spanPts.mn;
       chartFold.data.labels = labels;
       if (model.foldMode === "span") {
+        const norm = curr.map((v) => (mn > 0 ? v / mn : 1));
         chartFold.data.datasets[0].label = "M / min(M)";
-        chartFold.data.datasets[0].data = curr.map((v) => (mn > 0 ? v / mn : 1));
+        chartFold.data.datasets[0].data = norm;
+        chartFold.data.datasets[0].pointRadius = norm.map((_, i) =>
+          keyFold.some((p) => p.i === i) ? 0 : 2.5
+        );
         chartFold.data.datasets[1].label = `порог ${fmt(model.foldLimit, 1)}×`;
         chartFold.data.datasets[1].data = labels.map(() => model.foldLimit);
         chartFold.data.datasets[2].data = labels.map(() => null);
+        chartFold.data.datasets[3].data = foldKeys.data;
+        chartFold.data.datasets[3].pointBackgroundColor = foldKeys.colors;
         const yMax = Math.max(model.foldLimit * 1.2, Math.ceil(span * 1.1 * 10) / 10, 2);
         chartFold.options.scales.y.type = "linear";
         chartFold.options.scales.y.min = 0;
         chartFold.options.scales.y.max = yMax;
         chartFold.options.scales.y.title.text = "M / min(M)";
       } else {
+        const ratios = curr.map((v, i) => (model.baseM[i] > 0 ? v / model.baseM[i] : 1));
         chartFold.data.datasets[0].label = "M / Mbase";
-        chartFold.data.datasets[0].data = curr.map((v, i) => (model.baseM[i] > 0 ? v / model.baseM[i] : 1));
+        chartFold.data.datasets[0].data = ratios;
+        chartFold.data.datasets[0].pointRadius = ratios.map((_, i) =>
+          keyFold.some((p) => p.i === i) ? 0 : 2.5
+        );
         chartFold.data.datasets[1].label = `порог ${fmt(model.foldLimit, 1)}×`;
         chartFold.data.datasets[1].data = labels.map(() => model.foldLimit);
         chartFold.data.datasets[2].label = `1/${fmt(model.foldLimit, 1)}`;
         chartFold.data.datasets[2].data = labels.map(() => 1 / model.foldLimit);
+        chartFold.data.datasets[3].data = foldKeys.data;
+        chartFold.data.datasets[3].pointBackgroundColor = foldKeys.colors;
         const yMax = Math.max(model.foldLimit * 1.5, Math.ceil(vsBase * 1.15 * 10) / 10);
         chartFold.options.scales.y.type = "logarithmic";
         chartFold.options.scales.y.max = yMax;
@@ -843,6 +973,10 @@
         chartFold.options.scales.y.title.text = "Кратность (log)";
       }
       chartFold.update("none");
+
+      document.getElementById("foldNowSub").textContent = keyDesc;
+      document.getElementById("chartMobilityNote").textContent =
+        `Точки кратности: ${keyDesc}. Зелёные точки — все kin, ромбы — экстремумы критерия.`;
 
       const B = model.BOUNDS, Base = model.BASE;
       chartBounds.data.datasets[0].data = [B.ao.lo, B.aw.lo, B.krw.lo];
