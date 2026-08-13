@@ -375,23 +375,23 @@
             <div class="hdr">max</div>
 
             <div class="axis-name">αo</div>
-            <input type="number" id="cubeAoMin" step="0.01" />
-            <input type="number" id="cubeAoMax" step="0.01" />
+            <input type="number" id="cubeAoMin" step="0.01" min="0.5" max="7" />
+            <input type="number" id="cubeAoMax" step="0.01" min="0.5" max="7" />
 
             <div class="axis-name">αw</div>
-            <input type="number" id="cubeAwMin" step="0.01" />
-            <input type="number" id="cubeAwMax" step="0.01" />
+            <input type="number" id="cubeAwMin" step="0.01" min="0.5" max="9" />
+            <input type="number" id="cubeAwMax" step="0.01" min="0.5" max="9" />
 
             <div class="axis-name">krw</div>
-            <input type="number" id="cubeKrwMin" step="0.001" />
-            <input type="number" id="cubeKrwMax" step="0.001" />
+            <input type="number" id="cubeKrwMin" step="0.001" min="0.01" max="0.6" />
+            <input type="number" id="cubeKrwMax" step="0.001" min="0.01" max="0.6" />
           </div>
           <div class="btn-row" style="margin-bottom:0.7rem">
             <button type="button" id="btnCubeRangesOat">Из OAT</button>
-            <button type="button" id="btnCubeRangesWide">Широкий</button>
+            <button type="button" id="btnCubeRangesWide">Полный [допуск]</button>
           </div>
           <p class="hint" id="cubeRangeHint" style="margin-top:-0.35rem; margin-bottom:0.75rem">
-            Задайте min/max по осям гиперкуба. Срез двигается внутри выбранного диапазона.
+            Допустимые пределы: αo [0.5; 7], αw [0.5; 9], krw [0.01; 0.6]. Срез двигается внутри выбранного min/max.
           </p>
 
           <div class="legend-box">
@@ -538,12 +538,18 @@
     };
 
     const state = { ao: DEFAULTS.ao, aw: DEFAULTS.aw, krw: DEFAULTS.krw };
+    const CUBE_LIMITS = {
+      ao:  { min: 0.5, max: 7 },
+      aw:  { min: 0.5, max: 9 },
+      krw: { min: 0.01, max: 0.6 },
+    };
+
     const cubeUI = {
       plane: "ao", sliceT: 0.5, metric: "mean", kinIdx: 46, res: 12, ready: false,
       ranges: {
-        ao:  { min: 1.691, max: 4.761 },
-        aw:  { min: 3.317, max: 6.683 },
-        krw: { min: 0.0333, max: 0.300 },
+        ao:  { min: CUBE_LIMITS.ao.min, max: CUBE_LIMITS.ao.max },
+        aw:  { min: CUBE_LIMITS.aw.min, max: CUBE_LIMITS.aw.max },
+        krw: { min: CUBE_LIMITS.krw.min, max: CUBE_LIMITS.krw.max },
       },
     };
 
@@ -1099,16 +1105,25 @@
     }
 
     // ---- Hypercube ----
+    function clampCubeVal(key, v) {
+      const lim = CUBE_LIMITS[key];
+      return Math.min(lim.max, Math.max(lim.min, v));
+    }
+
     function axisRange(key) {
-      const r = cubeUI.ranges[key];
-      let min = Number(r.min);
-      let max = Number(r.max);
-      if (!Number.isFinite(min) || !Number.isFinite(max)) {
-        const b = model.BOUNDS[key];
-        return { min: b.lo, max: b.hi };
-      }
+      const lim = CUBE_LIMITS[key];
+      let min = Number(cubeUI.ranges[key].min);
+      let max = Number(cubeUI.ranges[key].max);
+      if (!Number.isFinite(min)) min = lim.min;
+      if (!Number.isFinite(max)) max = lim.max;
+      min = clampCubeVal(key, min);
+      max = clampCubeVal(key, max);
       if (max < min) { const t = min; min = max; max = t; }
-      if (max === min) max = min + (key === "krw" ? 0.01 : 0.1);
+      if (max === min) {
+        // expand slightly inside limits
+        if (max < lim.max) max = Math.min(lim.max, max + (key === "krw" ? 0.01 : 0.1));
+        else min = Math.max(lim.min, min - (key === "krw" ? 0.01 : 0.1));
+      }
       return { min, max };
     }
 
@@ -1118,31 +1133,35 @@
         aw: ["cubeAwMin", "cubeAwMax"],
         krw: ["cubeKrwMin", "cubeKrwMax"],
       };
+      // keep stored ranges clamped
       for (const key of ["ao", "aw", "krw"]) {
+        const r = axisRange(key);
+        cubeUI.ranges[key] = { min: r.min, max: r.max };
         const d = key === "krw" ? 4 : 3;
-        document.getElementById(map[key][0]).value = Number(cubeUI.ranges[key].min).toFixed(d);
-        document.getElementById(map[key][1]).value = Number(cubeUI.ranges[key].max).toFixed(d);
+        document.getElementById(map[key][0]).value = r.min.toFixed(d);
+        document.getElementById(map[key][1]).value = r.max.toFixed(d);
       }
       document.getElementById("cubeRangeHint").textContent =
-        `αo [${fmt(cubeUI.ranges.ao.min)}…${fmt(cubeUI.ranges.ao.max)}], ` +
+        `Рабочие: αo [${fmt(cubeUI.ranges.ao.min)}…${fmt(cubeUI.ranges.ao.max)}], ` +
         `αw [${fmt(cubeUI.ranges.aw.min)}…${fmt(cubeUI.ranges.aw.max)}], ` +
-        `krw [${fmt(cubeUI.ranges.krw.min, 4)}…${fmt(cubeUI.ranges.krw.max, 4)}]`;
+        `krw [${fmt(cubeUI.ranges.krw.min, 4)}…${fmt(cubeUI.ranges.krw.max, 4)}] · ` +
+        `лимиты αo[0.5;7] αw[0.5;9] krw[0.01;0.6]`;
     }
 
     function setCubeRangesFromOat() {
       cubeUI.ranges = {
-        ao:  { min: model.BOUNDS.ao.lo, max: model.BOUNDS.ao.hi },
-        aw:  { min: model.BOUNDS.aw.lo, max: model.BOUNDS.aw.hi },
-        krw: { min: model.BOUNDS.krw.lo, max: model.BOUNDS.krw.hi },
+        ao:  { min: clampCubeVal("ao", model.BOUNDS.ao.lo), max: clampCubeVal("ao", model.BOUNDS.ao.hi) },
+        aw:  { min: clampCubeVal("aw", model.BOUNDS.aw.lo), max: clampCubeVal("aw", model.BOUNDS.aw.hi) },
+        krw: { min: clampCubeVal("krw", model.BOUNDS.krw.lo), max: clampCubeVal("krw", model.BOUNDS.krw.hi) },
       };
       syncCubeRangeInputs();
     }
 
     function setCubeRangesWide() {
       cubeUI.ranges = {
-        ao:  { min: 0.5, max: 7 },
-        aw:  { min: 0.5, max: 9 },
-        krw: { min: 0.01, max: 0.6 },
+        ao:  { min: CUBE_LIMITS.ao.min, max: CUBE_LIMITS.ao.max },
+        aw:  { min: CUBE_LIMITS.aw.min, max: CUBE_LIMITS.aw.max },
+        krw: { min: CUBE_LIMITS.krw.min, max: CUBE_LIMITS.krw.max },
       };
       syncCubeRangeInputs();
     }
@@ -1156,14 +1175,13 @@
       for (const key of ["ao", "aw", "krw"]) {
         let { min, max } = raw[key];
         if (!Number.isFinite(min) || !Number.isFinite(max)) {
-          document.getElementById("cubeRangeHint").textContent = `Ошибка: некорректный диапазон ${key}.`;
+          document.getElementById("cubeRangeHint").textContent =
+            `Ошибка: некорректный диапазон ${key}. Допустимо αo[0.5;7], αw[0.5;9], krw[0.01;0.6].`;
           return false;
         }
-        if (min <= 0 && key !== "dummy") {
-          // allow small positives only for physical params
-        }
+        min = clampCubeVal(key, min);
+        max = clampCubeVal(key, max);
         if (max < min) { const t = min; min = max; max = t; }
-        if (max === min) max = min + (key === "krw" ? 0.01 : 0.1);
         cubeUI.ranges[key] = { min, max };
       }
       syncCubeRangeInputs();
